@@ -57,7 +57,8 @@ Attierly/
 │   ├── OutfitDetailView.swift      # Layer-ordered card stack view
 │   ├── OutfitRowCard.swift         # Compact outfit card for list
 │   ├── OutfitGenerationContextSheet.swift  # AI generation context picker
-│   └── ItemPickerSheet.swift       # Manual outfit item selection
+│   ├── ItemPickerSheet.swift       # Manual outfit item selection
+│   └── AddItemView.swift           # Manual wardrobe item entry form
 ├── Helpers/
 │   ├── ColorMapping.swift          # Color name → SwiftUI Color
 │   ├── ClothingItemDisplayable.swift  # Protocol for DTO + Model
@@ -176,6 +177,7 @@ All prompts (clothing analysis, duplicate detection, outfit generation) live as 
 - **Outfit display**: card-based layout with items ordered by layer (Outerwear → Full Body → Top → Bottom → Footwear → Accessory)
 - **Outfit management**: favorites, deletion, AI reasoning display
 - Layer ordering via `OutfitLayerOrder` helper — deterministic sort by category, designed to be reusable by v0.5 visual compositor
+- **Manual item entry**: add wardrobe items manually via form with Pickers for all attributes, optional photo attachment
 - Error handling (missing key, network, API, empty results, insufficient wardrobe)
 
 ## Roadmap

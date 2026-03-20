@@ -4,6 +4,7 @@ import SwiftData
 struct WardrobeView: View {
     @Query(sort: \ClothingItem.createdAt, order: .reverse) private var allItems: [ClothingItem]
     @State private var viewModel = WardrobeViewModel()
+    @State private var isShowingAddItem = false
     @Environment(\.modelContext) private var modelContext
 
     private let gridColumns = [
@@ -36,7 +37,7 @@ struct WardrobeView: View {
                         "No Items",
                         systemImage: "tshirt",
                         description: Text(allItems.isEmpty
-                            ? "Scan some clothes to build your wardrobe."
+                            ? "Scan or add clothes to build your wardrobe."
                             : "No items match the current filter.")
                     )
                 } else {
@@ -71,14 +72,25 @@ struct WardrobeView: View {
             .searchable(text: $viewModel.searchText)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        withAnimation {
-                            viewModel.displayMode = viewModel.displayMode == .grid ? .list : .grid
+                    HStack(spacing: 16) {
+                        Button {
+                            isShowingAddItem = true
+                        } label: {
+                            Image(systemName: "plus")
                         }
-                    } label: {
-                        Image(systemName: viewModel.displayMode == .grid ? "list.bullet" : "square.grid.2x2")
+
+                        Button {
+                            withAnimation {
+                                viewModel.displayMode = viewModel.displayMode == .grid ? .list : .grid
+                            }
+                        } label: {
+                            Image(systemName: viewModel.displayMode == .grid ? "list.bullet" : "square.grid.2x2")
+                        }
                     }
                 }
+            }
+            .sheet(isPresented: $isShowingAddItem) {
+                AddItemView()
             }
             .navigationDestination(for: PersistentIdentifier.self) { id in
                 if let item = allItems.first(where: { $0.persistentModelID == id }) {
@@ -94,7 +106,7 @@ struct WardrobeGridCell: View {
 
     var body: some View {
         VStack(spacing: 6) {
-            if let path = item.sourceImagePath,
+            if let path = item.imagePath ?? item.sourceImagePath,
                let image = ImageStorageService.loadImage(relativePath: path) {
                 Image(uiImage: image)
                     .resizable()

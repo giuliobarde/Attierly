@@ -6,6 +6,7 @@ Attierly is an iOS app that uses AI-powered vision to identify and analyze cloth
 
 - **Scan clothing** — camera or photo library input, Claude vision API identifies items with 12+ attributes (type, color, fabric, pattern, formality, season, etc.)
 - **Digital wardrobe** — persistent storage with grid/list views, category filtering, search, and full item editing
+- **Manual item entry** — add items to your wardrobe manually via a form with optional photo attachment
 - **Duplicate detection** — pre-filters by category+color, then uses Claude to classify same/similar/different items
 - **Outfit generation** — create outfits manually by picking items, or let AI suggest up to 3 coordinated outfits based on occasion and season
 - **Outfit display** — card-based layout with items ordered by layer (outerwear → tops → bottoms → footwear → accessories)
@@ -66,7 +67,8 @@ Attierly/
 │   ├── OutfitDetailView.swift         # Layer-ordered outfit detail
 │   ├── OutfitRowCard.swift            # Compact outfit list card
 │   ├── OutfitGenerationContextSheet.swift  # AI generation options
-│   └── ItemPickerSheet.swift          # Manual outfit item picker
+│   ├── ItemPickerSheet.swift          # Manual outfit item picker
+│   └── AddItemView.swift             # Manual wardrobe item entry
 ├── Helpers/
 │   ├── ColorMapping.swift             # Color name → SwiftUI Color
 │   ├── ClothingItemDisplayable.swift  # Protocol for DTO + Model

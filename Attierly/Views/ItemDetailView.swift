@@ -13,7 +13,7 @@ struct ItemDetailView: View {
         Form {
             // Image section
             Section {
-                if let path = item.sourceImagePath,
+                if let path = item.imagePath ?? item.sourceImagePath,
                    let image = ImageStorageService.loadImage(relativePath: path) {
                     Image(uiImage: image)
                         .resizable()

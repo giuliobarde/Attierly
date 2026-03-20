@@ -38,6 +38,33 @@ final class ClothingItem {
     var scanSession: ScanSession?
     var outfits: [Outfit] = []
 
+    init(
+        type: String,
+        category: String,
+        primaryColor: String,
+        pattern: String = "Solid",
+        fabricEstimate: String = "Cotton",
+        weight: String = "Midweight",
+        formality: String = "Casual",
+        season: [String] = ["Spring", "Summer", "Fall", "Winter"],
+        statementLevel: String = "Low",
+        itemDescription: String = ""
+    ) {
+        self.id = UUID()
+        self.type = type
+        self.category = category
+        self.primaryColor = primaryColor
+        self.pattern = pattern
+        self.fabricEstimate = fabricEstimate
+        self.weight = weight
+        self.formality = formality
+        self.season = season
+        self.statementLevel = statementLevel
+        self.itemDescription = itemDescription
+        self.createdAt = Date()
+        self.updatedAt = Date()
+    }
+
     init(from dto: ClothingItemDTO, sourceImagePath: String? = nil) {
         self.id = dto.id
         self.type = dto.type
