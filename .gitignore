@@ -1,0 +1,27 @@
+# API Key config (contains secrets)
+**/Config.plist
+
+# Xcode
+build/
+DerivedData/
+*.xcuserstate
+xcuserdata/
+*.xcworkspace/xcuserdata/
+*.pbxuser
+*.mode1v3
+*.mode2v3
+*.perspectivev3
+
+# macOS
+.DS_Store
+
+# CocoaPods (in case ever added)
+Pods/
+
+# Swift Package Manager
+.build/
+
+# Archives
+*.ipa
+*.dSYM.zip
+*.dSYM

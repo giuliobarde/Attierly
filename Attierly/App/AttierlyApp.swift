@@ -11,7 +11,7 @@ import SwiftUI
 struct AttierlyApp: App {
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            HomeView()
         }
     }
 }
