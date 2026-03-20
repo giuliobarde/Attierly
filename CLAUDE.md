@@ -1,5 +1,13 @@
 # Attierly — Project Guide
 
+## Documentation Rules
+After completing any code changes, **always update both `CLAUDE.md` and `README.md`** to reflect the current state of the project. This includes:
+- New or removed files → update **Project Structure** in both files
+- New features or changed behavior → update **Current State** in CLAUDE.md and **Features** in README.md
+- New or changed models → update **Data Model Design** in CLAUDE.md
+- New API methods or prompt changes → update **API Integration Details** in CLAUDE.md
+- Roadmap items that are now implemented → move from **Roadmap** to **Current State**
+
 ## What is Attierly?
 A wardrobe management iOS app. Users scan clothing via camera/photo library, the app identifies items using Claude's vision API, and builds a persistent digital wardrobe. Users can generate outfits manually or with AI assistance.
 
@@ -172,7 +180,16 @@ All prompts (clothing analysis, duplicate detection, outfit generation) live as 
 
 ## Roadmap
 
-### v0.4 — Image Extraction & Confidence (next)
+### v0.3.1 — Weather-Aware Outfit Recommendations (next)
+- Integrate Apple WeatherKit (or a free weather API) to fetch current conditions and forecast for the user's location
+- Pass weather context (temperature, conditions, humidity, wind) to the outfit generation prompt alongside occasion/season
+- Weather-adaptive prompt guidance: suggest lighter fabrics and fewer layers in heat, heavier weight and outerwear in cold, water-resistant items in rain
+- Display current weather summary in the `OutfitGenerationContextSheet` so the user sees what context the AI is working with
+- Auto-populate the season picker based on current date/hemisphere
+- Optional: let the user override or ignore weather context if they prefer manual season selection
+- Requires `CoreLocation` for user location (request "when in use" permission) and either WeatherKit entitlement or a third-party weather API key in `Config.plist`
+
+### v0.4 — Image Extraction & Confidence
 - Crop/extract individual items from group photos into per-item images stored separately from the source scan image
 - Use Apple Vision framework (`VNGenerateForegroundInstanceMaskRequest`) for background removal to produce clean cutouts on transparent backgrounds
 - Potentially use Vision framework for object detection bounding boxes before sending to Claude
@@ -213,7 +230,6 @@ Scaling is relative to a standard body proportion so items look right together r
 - Style analytics (most worn items, color distribution, etc.)
 - Share outfits
 - Seasonal wardrobe rotation suggestions
-- Weather API integration for context-aware outfit suggestions
 - Virtual try-on: user photo + generated outfit overlay (significant technical leap, requires pose estimation)
 
 ## Data Model Design
