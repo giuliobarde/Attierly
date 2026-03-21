@@ -30,6 +30,7 @@ struct OutfitsView: View {
                     }
                 }
             }
+            .background(Theme.screenBackground)
             .navigationTitle("Outfits")
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
