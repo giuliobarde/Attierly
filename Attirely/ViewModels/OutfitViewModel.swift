@@ -26,6 +26,8 @@ class OutfitViewModel {
 
     var modelContext: ModelContext?
     var weatherViewModel: WeatherViewModel?
+    var userProfile: UserProfile?
+    var styleSummaryText: String?
 
     // MARK: - List
 
@@ -40,6 +42,14 @@ class OutfitViewModel {
 
     func toggleFavorite(_ outfit: Outfit) {
         outfit.isFavorite.toggle()
+        // Backfill weather snapshot when favoriting if not already captured
+        if outfit.isFavorite, outfit.weatherTempAtCreation == nil,
+           let snapshot = weatherViewModel?.snapshot {
+            outfit.weatherTempAtCreation = snapshot.current.temperature
+            outfit.weatherFeelsLikeAtCreation = snapshot.current.feelsLike
+            outfit.seasonAtCreation = weatherViewModel?.suggestedSeason
+            outfit.monthAtCreation = outfit.monthAtCreation ?? Calendar.current.component(.month, from: Date())
+        }
         try? modelContext?.save()
     }
 
@@ -75,6 +85,7 @@ class OutfitViewModel {
             isAIGenerated: false,
             items: selected
         )
+        captureWeatherSnapshot(on: outfit)
         modelContext.insert(outfit)
         try? modelContext.save()
 
@@ -100,7 +111,9 @@ class OutfitViewModel {
                     from: allItems,
                     occasion: selectedOccasion,
                     season: selectedSeason,
-                    weatherContext: weatherViewModel?.weatherContextString
+                    weatherContext: weatherViewModel?.weatherContextString,
+                    comfortPreferences: comfortPreferencesString(from: userProfile),
+                    styleSummary: styleSummaryText
                 )
 
                 var created: [Outfit] = []
@@ -117,6 +130,7 @@ class OutfitViewModel {
                         isAIGenerated: true,
                         items: matchedItems
                     )
+                    captureWeatherSnapshot(on: outfit)
                     modelContext.insert(outfit)
                     created.append(outfit)
                 }
@@ -141,5 +155,44 @@ class OutfitViewModel {
     func autoPopulateSeason() {
         guard selectedSeason == nil else { return }
         selectedSeason = weatherViewModel?.suggestedSeason
+    }
+
+    // MARK: - Weather Snapshot
+
+    private func captureWeatherSnapshot(on outfit: Outfit) {
+        if let snapshot = weatherViewModel?.snapshot {
+            outfit.weatherTempAtCreation = snapshot.current.temperature
+            outfit.weatherFeelsLikeAtCreation = snapshot.current.feelsLike
+            outfit.seasonAtCreation = weatherViewModel?.suggestedSeason
+        }
+        outfit.monthAtCreation = Calendar.current.component(.month, from: Date())
+    }
+
+    // MARK: - Comfort Preferences
+
+    func comfortPreferencesString(from profile: UserProfile?) -> String? {
+        guard let profile else { return nil }
+        var lines: [String] = []
+
+        if let cold = profile.coldSensitivityEnum {
+            lines.append("Cold sensitivity: \(cold.rawValue)")
+        }
+        if let heat = profile.heatSensitivityEnum {
+            lines.append("Heat sensitivity: \(heat.rawValue)")
+        }
+        if let notes = profile.bodyTempNotes, !notes.trimmingCharacters(in: .whitespaces).isEmpty {
+            lines.append("Body temp notes: \(notes.trimmingCharacters(in: .whitespaces))")
+        }
+        if let layering = profile.layeringPreferenceEnum {
+            lines.append("Layering preference: \(layering.rawValue)")
+        }
+        if let comfort = profile.comfortVsAppearanceEnum {
+            lines.append("Comfort vs appearance: \(comfort.rawValue)")
+        }
+        if let approach = profile.weatherDressingApproachEnum {
+            lines.append("Weather dressing: \(approach.rawValue)")
+        }
+
+        return lines.isEmpty ? nil : lines.joined(separator: "\n")
     }
 }

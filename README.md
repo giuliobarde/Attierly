@@ -12,8 +12,11 @@ Attirely is an iOS app that uses AI-powered vision to identify and analyze cloth
 - **Weather-aware outfits** — real-time weather via WeatherKit (Open-Meteo fallback), compact toolbar indicator, weather detail sheet with hourly forecast, AI adapts outfit suggestions to temperature, precipitation, and conditions
 - **Outfit display** — card-based layout with items ordered by layer (outerwear → tops → bottoms → footwear → accessories)
 - **Favorites** — star outfits for quick access
-- **Profile page** — user name, profile photo, and wardrobe summary stats
+- **Profile page** — user name, profile photo, wardrobe summary stats, style & comfort questionnaire, and style summary display
+- **Style & Comfort questionnaire** — cold/heat sensitivity, body temp notes, layering preference, style identity (multi-select tag grid), comfort vs appearance, and weather dressing approach
+- **Style summary** — auto-generated from questionnaire via template, editable by user, displayed on profile page
 - **User preferences** — temperature unit (°C/°F) applied across all weather displays, theme preference (System/Light/Dark) with full dark mode, custom location override with city geocoding
+- **Comfort-aware outfits** — AI outfit generation respects user's comfort preferences (cold/heat sensitivity, layering, weather dressing approach) as hard constraints
 - **Dark mode** — warm espresso/charcoal dark palette with adaptive colors throughout; champagne accent stays consistent across modes
 - **Wardrobe analytics** — category composition (bar chart), formality breakdown (donut chart), and color distribution (swatch grid) powered by Swift Charts
 - **Brand design system** — centralized theme with Obsidian/Ivory/Stone/Champagne/Blush palette, reusable card/pill/tag modifiers, and consistent typography across all views
@@ -49,10 +52,11 @@ Attirely/
 │   ├── ClothingItem.swift             # Clothing item data model
 │   ├── ClothingItemDTO.swift          # API response parsing
 │   ├── ScanSession.swift              # Scan session grouping
-│   ├── Outfit.swift                   # Outfit collection model
+│   ├── Outfit.swift                   # Outfit collection model (+ weather snapshot)
 │   ├── OutfitSuggestionDTO.swift      # AI outfit response parsing
 │   ├── WeatherData.swift              # Weather data structs (ephemeral)
-│   └── UserProfile.swift             # User profile + preferences model
+│   ├── UserProfile.swift             # User profile, preferences, style questionnaire
+│   └── StyleSummary.swift            # Style summary model (template/AI)
 ├── Services/
 │   ├── AnthropicService.swift         # Claude API (scan, duplicates, outfits)
 │   ├── ConfigManager.swift            # API key configuration
@@ -91,7 +95,8 @@ Attirely/
 │   ├── ClothingItemDisplayable.swift  # Protocol for DTO + Model
 │   ├── OutfitLayerOrder.swift         # Category layer sorting
 │   ├── SeasonHelper.swift             # Season detection from date/weather
-│   └── TemperatureFormatter.swift    # °C/°F formatting helper
+│   ├── TemperatureFormatter.swift    # °C/°F formatting helper
+│   └── StyleSummaryTemplate.swift   # Deterministic style summary generator
 └── Resources/
     ├── Config.plist.example           # API key template
     └── Assets.xcassets                # App assets

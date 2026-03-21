@@ -7,6 +7,7 @@ struct ProfileView: View {
     @Query private var profiles: [UserProfile]
     @Query private var clothingItems: [ClothingItem]
     @Query private var outfits: [Outfit]
+    @Query private var styleSummaries: [StyleSummary]
 
     @State private var viewModel = ProfileViewModel()
     @State private var selectedPhoto: PhotosPickerItem?
@@ -20,6 +21,8 @@ struct ProfileView: View {
                     if let profile {
                         profileHeader(profile)
                         preferencesSection(profile)
+                        styleComfortSection(profile)
+                        styleSummarySection
                         analyticsSection
                     }
                 }
@@ -214,6 +217,210 @@ struct ProfileView: View {
                         .foregroundStyle(Theme.secondaryText)
                     }
                 }
+            }
+        }
+        .themeCard()
+    }
+
+    // MARK: - Style & Comfort
+
+    private func styleComfortSection(_ profile: UserProfile) -> some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Style & Comfort")
+                .font(.subheadline)
+                .fontWeight(.medium)
+                .foregroundStyle(Theme.primaryText)
+
+            // Cold sensitivity
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Cold Sensitivity")
+                    .font(.caption)
+                    .foregroundStyle(Theme.secondaryText)
+                Picker("Cold Sensitivity", selection: Binding(
+                    get: { profile.coldSensitivityEnum ?? .moderate },
+                    set: { viewModel.updateColdSensitivity($0, profile: profile) }
+                )) {
+                    ForEach(ColdSensitivity.allCases, id: \.self) { level in
+                        Text(level.rawValue).tag(level)
+                    }
+                }
+                .pickerStyle(.segmented)
+            }
+
+            Divider()
+
+            // Heat sensitivity
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Heat Sensitivity")
+                    .font(.caption)
+                    .foregroundStyle(Theme.secondaryText)
+                Picker("Heat Sensitivity", selection: Binding(
+                    get: { profile.heatSensitivityEnum ?? .moderate },
+                    set: { viewModel.updateHeatSensitivity($0, profile: profile) }
+                )) {
+                    ForEach(HeatSensitivity.allCases, id: \.self) { level in
+                        Text(level.rawValue).tag(level)
+                    }
+                }
+                .pickerStyle(.segmented)
+            }
+
+            Divider()
+
+            // Body temperature notes
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Body Temperature Notes")
+                    .font(.caption)
+                    .foregroundStyle(Theme.secondaryText)
+                TextField("e.g., legs run hot, hands always cold", text: Binding(
+                    get: { profile.bodyTempNotes ?? "" },
+                    set: { viewModel.updateBodyTempNotes($0, profile: profile) }
+                ))
+                .textFieldStyle(.roundedBorder)
+                .font(.subheadline)
+            }
+
+            Divider()
+
+            // Layering preference
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Layering Preference")
+                    .font(.caption)
+                    .foregroundStyle(Theme.secondaryText)
+                Picker("Layering", selection: Binding(
+                    get: { profile.layeringPreferenceEnum ?? .happy },
+                    set: { viewModel.updateLayeringPreference($0, profile: profile) }
+                )) {
+                    ForEach(LayeringPreference.allCases, id: \.self) { pref in
+                        Text(pref.rawValue).tag(pref)
+                    }
+                }
+                .pickerStyle(.segmented)
+            }
+
+            Divider()
+
+            // Style identity (multi-select tag grid)
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Style Identity")
+                    .font(.caption)
+                    .foregroundStyle(Theme.secondaryText)
+
+                let allStyles = ["Minimalist", "Streetwear", "Preppy", "Classic", "Bohemian",
+                                 "Athletic", "Avant-Garde", "Vintage", "Smart Casual"]
+                let selected = profile.selectedStylesArray
+
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 100), spacing: 8)], spacing: 8) {
+                    ForEach(allStyles, id: \.self) { style in
+                        Button {
+                            viewModel.toggleStyle(style, profile: profile)
+                        } label: {
+                            Text(style)
+                                .font(.caption)
+                                .fontWeight(.medium)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 6)
+                                .frame(maxWidth: .infinity)
+                                .background(
+                                    selected.contains(style) ? Theme.pillActiveBg : Theme.pillDefaultBg
+                                )
+                                .foregroundStyle(
+                                    selected.contains(style) ? Theme.champagne : Theme.pillDefaultText
+                                )
+                                .clipShape(Capsule())
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+
+            Divider()
+
+            // Comfort vs appearance
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Comfort vs Appearance")
+                    .font(.caption)
+                    .foregroundStyle(Theme.secondaryText)
+                Picker("Comfort", selection: Binding(
+                    get: { profile.comfortVsAppearanceEnum ?? .balanced },
+                    set: { viewModel.updateComfortVsAppearance($0, profile: profile) }
+                )) {
+                    ForEach(ComfortVsAppearance.allCases, id: \.self) { pref in
+                        Text(pref.rawValue).tag(pref)
+                    }
+                }
+                .pickerStyle(.segmented)
+            }
+
+            Divider()
+
+            // Weather dressing approach
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Weather Dressing")
+                    .font(.caption)
+                    .foregroundStyle(Theme.secondaryText)
+                Picker("Weather Dressing", selection: Binding(
+                    get: { profile.weatherDressingApproachEnum ?? .conditions },
+                    set: { viewModel.updateWeatherDressingApproach($0, profile: profile) }
+                )) {
+                    ForEach(WeatherDressingApproach.allCases, id: \.self) { approach in
+                        Text(approach.rawValue).tag(approach)
+                    }
+                }
+                .pickerStyle(.segmented)
+            }
+        }
+        .themeCard()
+    }
+
+    // MARK: - Style Summary
+
+    private var styleSummarySection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text("Your Style Summary")
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                    .foregroundStyle(Theme.primaryText)
+                Spacer()
+                if styleSummaries.first != nil {
+                    Button(viewModel.isEditingStyleSummary ? "Done" : "Edit") {
+                        if viewModel.isEditingStyleSummary {
+                            viewModel.updateSummaryText(viewModel.editedStyleSummary)
+                        } else {
+                            viewModel.editedStyleSummary = styleSummaries.first?.overallIdentity ?? ""
+                        }
+                        viewModel.isEditingStyleSummary.toggle()
+                    }
+                    .font(.caption)
+                    .foregroundStyle(Theme.champagne)
+                }
+            }
+
+            if let summary = styleSummaries.first {
+                if viewModel.isEditingStyleSummary {
+                    TextEditor(text: $viewModel.editedStyleSummary)
+                        .font(.subheadline)
+                        .foregroundStyle(Theme.primaryText)
+                        .frame(minHeight: 100)
+                        .scrollContentBackground(.hidden)
+                        .padding(4)
+                        .background(Theme.placeholderFill)
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                } else {
+                    Text(summary.overallIdentity)
+                        .font(.subheadline)
+                        .foregroundStyle(Theme.primaryText)
+                }
+
+                if summary.isUserEdited {
+                    Text("Edited by you")
+                        .themeTag()
+                }
+            } else {
+                Text("Fill out the style questionnaire above to generate your summary.")
+                    .font(.caption)
+                    .foregroundStyle(Theme.secondaryText)
             }
         }
         .themeCard()

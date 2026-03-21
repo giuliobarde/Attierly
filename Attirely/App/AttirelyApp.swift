@@ -8,7 +8,7 @@ struct AttirelyApp: App {
             ThemeWrapper()
                 .tint(Theme.champagne)
         }
-        .modelContainer(for: [ClothingItem.self, ScanSession.self, Outfit.self, UserProfile.self])
+        .modelContainer(for: [ClothingItem.self, ScanSession.self, Outfit.self, UserProfile.self, StyleSummary.self])
     }
 }
 

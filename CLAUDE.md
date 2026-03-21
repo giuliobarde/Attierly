@@ -33,10 +33,11 @@ Attirely/
 │   ├── ClothingItem.swift          # SwiftData @Model (persistent)
 │   ├── ClothingItemDTO.swift       # Codable struct (API parsing)
 │   ├── ScanSession.swift           # SwiftData @Model
-│   ├── Outfit.swift                # SwiftData @Model (outfit collection)
+│   ├── Outfit.swift                # SwiftData @Model (outfit collection + weather snapshot)
 │   ├── OutfitSuggestionDTO.swift   # Codable struct (AI outfit parsing)
 │   ├── WeatherData.swift           # Ephemeral structs (current + hourly weather)
-│   └── UserProfile.swift           # SwiftData @Model (user prefs, profile)
+│   ├── UserProfile.swift           # SwiftData @Model (user prefs, profile, style questionnaire)
+│   └── StyleSummary.swift          # SwiftData @Model (template/AI style summary)
 ├── Services/
 │   ├── AnthropicService.swift      # Claude API calls (scan, duplicates, outfits)
 │   ├── ConfigManager.swift         # Reads API key from Config.plist
@@ -75,7 +76,8 @@ Attirely/
 │   ├── ClothingItemDisplayable.swift  # Protocol for DTO + Model
 │   ├── OutfitLayerOrder.swift      # Category → layer sort order
 │   ├── SeasonHelper.swift          # Season detection from date/weather
-│   └── TemperatureFormatter.swift  # °C/°F formatting helper
+│   ├── TemperatureFormatter.swift  # °C/°F formatting helper
+│   └── StyleSummaryTemplate.swift  # Deterministic style summary from questionnaire
 └── Resources/
     ├── Config.plist.example
     └── Assets.xcassets
@@ -151,8 +153,20 @@ Attirely/
 - Prompt enforces: 3-6 items per outfit, exactly one footwear, max 3-4 colors, max 2 patterns, consistent formality
 - Weather-adaptive rules: temperature-based layering/fabric guidance, precipitation awareness, UV consideration
 - Optional `weatherContext` parameter appended to prompt with current conditions
+- **Comfort preferences** injected as hard constraints (override style preferences when conflicting)
+- **Style summary** optionally appended to prompt for aesthetic alignment
 - Uses 2048 max tokens (vs 4096 for vision analysis)
 - **Planned improvement**: generate 1 outfit per request (not 3), and include existing outfit item-ID sets in the prompt to prevent duplicate suggestions
+
+### Style Analysis API
+- Text-only request — sends wardrobe item attributes, outfit compositions (grouped by favorited → manual → AI-generated), and previous style summary (for incremental analysis)
+- Returns structured JSON with: `overallIdentity`, `styleModes` (array of detected modes with name/description/colorPalette/formality), `temporalNotes` (observed trends/phase momentum), `gapObservations`
+- **Initial analysis** prompt: full wardrobe data + outfit data, no prior summary
+- **Incremental analysis** prompt: includes previous summary as stable baseline, only new items/outfits since last analysis. Prompt explicitly instructs: "The existing profile is the baseline. Only adjust conclusions where the new evidence is clearly compelling. Style identity is stable — do not overreact to a single new purchase."
+- **Favorited outfits** are the highest-weight signal — separated and emphasized in the prompt above manual outfits and AI-generated outfits
+- **Weather-relative behavior**: outfit weather snapshots (temperature + month) are included so the AI can detect seasonal-relative dressing patterns (e.g., "dresses warmer than temperature suggests in early spring")
+- If user has edited the style summary (`isUserEdited` flag), the edited version is used as the baseline for incremental analysis, with a note in the prompt that the user has personally refined it
+- Uses 2048 max tokens
 
 ### Weather API
 - **Primary**: Apple WeatherKit via `WeatherKit.WeatherService.shared.weather(for:)` — requires WeatherKit entitlement
@@ -162,7 +176,7 @@ Attirely/
 - Location via CoreLocation `CLLocationManager` with "when in use" permission
 
 ### Prompt Location
-All prompts (clothing analysis, duplicate detection, outfit generation) live as string constants inside `AnthropicService`. If prompts grow more complex in later versions, extract to a `Prompts/` directory with one file per prompt.
+All prompts (clothing analysis, duplicate detection, outfit generation, style analysis) live as string constants inside `AnthropicService`. If prompts grow more complex in later versions, extract to a `Prompts/` directory with one file per prompt.
 
 ### API Key
 - Read once from `Config.plist` at launch via `ConfigManager`.
@@ -186,7 +200,7 @@ All prompts (clothing analysis, duplicate detection, outfit generation) live as 
 - **No nested closures for async work.** Use `async/await`.
 - **No editing `.pbxproj` by hand.** File sync handles source files. Build settings go through Xcode's UI or `xcconfig` files.
 
-## Current State (v0.4) ✅
+## Current State (v0.5a) ✅
 - Camera and photo library input
 - Claude vision API integration for clothing detection
 - Results displayed as cards with all attributes
@@ -213,6 +227,10 @@ All prompts (clothing analysis, duplicate detection, outfit generation) live as 
 - **Location override**: user can set a custom city; forward geocoding converts to coordinates; weather fetches use override location when enabled
 - Error handling (missing key, network, API, empty results, insufficient wardrobe)
 - **Brand design system**: centralized `Theme.swift` with adaptive color tokens (Obsidian, Ivory, Stone, Champagne, Blush, Border), reusable ViewModifiers (`.themeCard()`, `.themePill()`, `.themeTag()`), and ButtonStyles (`.themePrimary`, `.themeSecondary`). CHAMPAGNE set as AccentColor globally. Light mode: IVORY backgrounds, glass-tinted cards. Dark mode: warm espresso backgrounds, dark glass cards. Consistent typography across all views.
+- **Style & Comfort questionnaire**: "Style & Comfort" section on Profile page with cold/heat sensitivity pickers, body temp notes, layering preference, style identity multi-select (tag grid), comfort vs appearance, and weather dressing approach. All stored as raw strings on `UserProfile` with enum bridges.
+- **Template-based style summary**: `StyleSummaryTemplate` helper generates a readable style summary from questionnaire answers via deterministic string interpolation (no LLM). Auto-generated on questionnaire save, displayed below questionnaire with manual edit support. `StyleSummary` SwiftData model tracks summary state (`isUserEdited`, `isAIEnriched`).
+- **Weather snapshot on outfits**: `Outfit` captures current temperature, feels-like, season, and month at creation (manual and AI-generated). Backfills weather on favorite if not captured at creation.
+- **Comfort-aware outfit generation**: AI outfit generation prompt injects user's comfort preferences (cold/heat sensitivity, layering, weather dressing approach) as hard constraints above style guidance. Style summary appended as context when available.
 
 ## Roadmap
 
@@ -221,16 +239,69 @@ All prompts (clothing analysis, duplicate detection, outfit generation) live as 
 - **Deduplicate** against existing outfits — before generating, pass existing outfit item-ID sets to the prompt so the AI avoids suggesting an outfit combination that already exists in the user's collection
 - Requires changes to: `AnthropicService.generateOutfits()` prompt (request 1 outfit, add dedup context), `OutfitViewModel.generateOutfits()` (pass existing outfit item-IDs)
 
-### v0.5 — Style Intelligence (next)
-- **AI Style Agent**: analyze the user's full wardrobe to generate a written style profile summary
-- Identifies dominant aesthetics (e.g., "minimalist", "streetwear", "classic"), color palettes the user gravitates toward, formality tendencies, pattern preferences, and gaps/opportunities ("you have many casual tops but few smart-casual options")
-- **Wardrobe analytics**: color distribution, formality breakdown, category composition stats, seasonal coverage gaps
-- The style summary is stored persistently and displayed as editable text — the user can view, refine, or override the AI's perception of their style
-- The style summary is optionally fed into the outfit generation prompt so the AI generates outfits that align with the user's established style identity
-- **Auto re-analysis**: triggered automatically whenever the user manually creates an outfit (manual creation signals intentional style preference). Also triggerable manually via a "Re-analyze" button
-- **Incremental analysis**: re-analysis receives the previous style summary alongside new wardrobe data. The previous analysis is weighted more heavily than new data to maintain stability — style identity evolves gradually, not with every new item. The prompt instructs the AI to treat the existing summary as the baseline and only adjust where new evidence is compelling
-- Requires a new SwiftData model for style summary persistence (summary text, last analyzed date, analysis version/count)
-- **Style summary display**: Add the AI-generated style profile to the profile page from v0.4 so the user can view and edit it
+### v0.5 — Style Intelligence
+
+#### v0.5a — Data Model & Style Questionnaire ✅ (IMPLEMENTED)
+- `StyleSummary` SwiftData @Model, `UserProfile` questionnaire fields, `Outfit` weather snapshot fields
+- Style & Comfort questionnaire UI on Profile page (7 fields with tag grid for style identity)
+- Template-based summary generation via `StyleSummaryTemplate` helper
+- Weather snapshot capture on outfit creation/favoriting
+- Comfort preferences injected as hard constraints in outfit generation prompt
+
+#### v0.5b — AI Style Analysis
+- **`AnthropicService.analyzeStyle()`**: new API method for style analysis
+- **Initial analysis**: triggered when wardrobe crosses a threshold (~8–10 items). Sends all wardrobe item attributes + all outfit compositions (favorited outfits emphasized as highest-weight signal, then manual outfits, then AI-generated). Questionnaire-generated summary included as "user-declared ground truth — do not contradict."
+- **Incremental analysis**: triggered by debounced wardrobe changes (see trigger rules below). Sends previous summary as stable baseline + only delta (new items, new outfits since last analysis). Prompt instructs AI to treat existing summary as baseline and only adjust where new evidence is compelling.
+- **Style modes**: the AI detects distinct style modes organically from the data (especially from favorited outfit clusters). Not forced to a fixed count — some users have one cohesive style, others have 3–4 modes. Each mode has its own name, description, color palette, and formality level.
+- **Temporal trends / phases**: AI notes any directional shifts in recent additions or recent favorites vs. older ones. Framed as observations, not identity rewrites (e.g., "Recent additions lean toward relaxed tailoring compared to earlier casual streetwear pieces").
+- **Weather-relative behavior**: outfit weather snapshots (temperature + month) included in analysis. AI detects seasonal-relative dressing patterns (e.g., "Dresses warmer than temperature suggests in early spring after winter. Acclimates fully by mid-season."). This behavioral pattern is stored in the summary and fed into outfit generation.
+- **Gap observations**: AI identifies wardrobe gaps and opportunities (e.g., "Many casual tops but few smart-casual options").
+
+#### Style Analysis Trigger Rules
+Auto-trigger re-analysis when:
+- **First analysis**: wardrobe crosses 8–10 items (minimum signal threshold)
+- **Manual outfit creation**: strong style intent signal — but debounced (see below)
+- **Outfit favorited**: strongest signal of style identity — triggers analysis consideration
+- **Batch additions**: 5+ items added in a single session
+
+Debounce strategy: track `itemCountAtLastAnalysis` and `favoritedOutfitCountAtLastAnalysis` on `StyleSummary`. Only auto-trigger when delta since last analysis crosses a threshold (3–5 new items, or 2+ new favorited outfits). Always allow manual "Re-analyze" button.
+
+Do NOT auto-trigger on:
+- Single item scans (accumulate dirty flag instead)
+- Item deletion (rarely changes style profile)
+- Item field edits (housekeeping, not style shift)
+
+#### Signal Hierarchy for Style Analysis
+**Tier 1 — highest signal:**
+- Favorited outfits (explicit "this is me" declaration)
+- Manual outfit compositions (intentional taste signal)
+- Category distribution (wardrobe shape)
+- Color clustering (dominant palette, not just presence)
+
+**Tier 2 — supporting signal:**
+- Formality distribution
+- Pattern preferences
+- Brand presence (if data exists)
+- Weather-relative outfit choices (temperature + month at creation)
+
+**Tier 3 — context, not core:**
+- Seasonal coverage
+- Fabric tendencies (lower confidence from photo-based estimates)
+- Statement level distribution
+
+#### Style Summary → Outfit Generation Integration
+Outfit generation prompt receives three layers (in priority order):
+1. **Comfort constraints** (from UserProfile questionnaire fields) — hard constraints, never overridden by style
+2. **Weather appropriateness** (live weather + seasonal-relative behavioral patterns from style summary)
+3. **Style alignment** (overall identity + relevant style mode from style summary)
+
+The style summary is always included once it exists. No user toggle — it enhances generation silently.
+
+#### User Editability
+- Style summary displayed on Profile page as editable text
+- If user edits the summary, `isUserEdited` flag is set
+- Edited version becomes the baseline for next incremental analysis, with prompt note: "The user has personally refined this description — weight it heavily"
+- Questionnaire answers remain separately editable; changing them re-templates the summary only if no AI enrichment has occurred yet (`isAIEnriched == false`). If AI-enriched, questionnaire changes trigger a new incremental analysis that merges updated answers with existing wardrobe observations.
 
 ### v0.6 — Image Extraction & Confidence
 - Crop/extract individual items from group photos into per-item images stored separately from the source scan image
@@ -304,7 +375,7 @@ ScanSession (SwiftData @Model) — IMPLEMENTED
 ├── date: Date
 └── items: [ClothingItem]
 
-Outfit (SwiftData @Model) — IMPLEMENTED
+Outfit (SwiftData @Model) — IMPLEMENTED (weather snapshots: v0.5a)
 ├── id: UUID
 ├── name: String?
 ├── occasion: String?
@@ -313,7 +384,11 @@ Outfit (SwiftData @Model) — IMPLEMENTED
 ├── isFavorite: Bool
 ├── createdAt: Date
 ├── items: [ClothingItem]         # @Relationship(deleteRule: .nullify)
-└── displayName: String           # computed: name → occasion → formatted date
+├── displayName: String           # computed: name → occasion → formatted date
+├── weatherTempAtCreation: Double? #  v0.5a — actual temp (Celsius) when outfit was created/favorited
+├── weatherFeelsLikeAtCreation: Double? # v0.5a — feels-like temp at creation
+├── seasonAtCreation: String?     # v0.5a — "spring"/"summer"/"fall"/"winter"
+└── monthAtCreation: Int?         # v0.5a — 1-12, more granular than season for early/late distinction
 
 OutfitSuggestionDTO (Codable struct) — IMPLEMENTED
 ├── name: String
@@ -321,7 +396,6 @@ OutfitSuggestionDTO (Codable struct) — IMPLEMENTED
 ├── itemIDs: [String]             # CodingKey: "item_ids"
 ├── reasoning: String
 └── Used only for AI response parsing, then converted to Outfit
-```
 
 CurrentWeather (struct, ephemeral) — IMPLEMENTED
 ├── temperature, feelsLike: Double (Celsius)
@@ -342,7 +416,7 @@ WeatherSnapshot (struct, ephemeral) — IMPLEMENTED
 ├── fetchedAt: Date
 └── locationName: String?
 
-UserProfile (SwiftData @Model) — IMPLEMENTED
+UserProfile (SwiftData @Model) — IMPLEMENTED (questionnaire fields: v0.5a)
 ├── id: UUID
 ├── name: String
 ├── profileImagePath: String?     # relative path to profile photo on disk
@@ -353,7 +427,31 @@ UserProfile (SwiftData @Model) — IMPLEMENTED
 ├── locationOverrideLat: Double?  # geocoded latitude
 ├── locationOverrideLon: Double?  # geocoded longitude
 ├── createdAt: Date
-└── updatedAt: Date
+├── updatedAt: Date
+│   # v0.5a — Style Questionnaire fields (structured, user-declared)
+├── coldSensitivity: String?      # "low"/"moderate"/"high"
+├── heatSensitivity: String?      # "low"/"moderate"/"high"
+├── bodyTempNotes: String?        # free text (e.g., "legs run hot, torso runs cold")
+├── layeringPreference: String?   # "minimal"/"moderate"/"heavy"
+├── selectedStyles: String?       # JSON array of style labels (e.g., ["preppy","streetwear"])
+├── comfortVsAppearance: String?  # "comfort"/"balanced"/"appearance"
+└── weatherDressingApproach: String? # "light"/"exact"/"overdress"
+
+StyleSummary (SwiftData @Model) — v0.5a (NEW)
+├── id: UUID
+├── overallIdentity: String       # throughlines that span all style modes
+├── styleModes: String?           # JSON array of mode objects [{name, description, colorPalette, formality}]
+├── temporalNotes: String?        # observed trends / phase momentum
+├── gapObservations: String?      # "you have lots of X but no Y"
+├── weatherBehavior: String?      # seasonal-relative dressing patterns
+├── lastAnalyzedAt: Date
+├── itemCountAtLastAnalysis: Int
+├── outfitCountAtLastAnalysis: Int
+├── favoritedOutfitCountAtLastAnalysis: Int
+├── analysisVersion: Int          # increments each re-analysis
+├── isUserEdited: Bool            # true if user has manually tweaked the text
+├── isAIEnriched: Bool            # true once AI analysis has run (vs questionnaire-only)
+└── createdAt: Date
 ```
 
 ### Planned Model Extensions
@@ -366,6 +464,14 @@ ClothingItem — v0.6 additions
 ClothingItem — v0.7 additions
 └── flatLayImagePath: String?     # path to AI-generated or user-provided flat-lay image
 ```
+
+## Style Summary Template Generation (v0.5a)
+
+Questionnaire answers are converted to a readable style summary via deterministic string interpolation — no LLM call required. Template logic lives in a helper (e.g., `StyleSummaryTemplate.swift`). Example output:
+
+> "Very sensitive to cold, especially upper body. Prefers heavy layering even in mild weather. Low heat sensitivity. Drawn to preppy and streetwear aesthetics. Prioritizes comfort over formality. Tends to overdress for warmth in transitional weather."
+
+This summary is immediately useful for outfit generation even before any AI analysis enriches it.
 
 ## Duplicate Detection Strategy
 When new items are scanned, compare against existing wardrobe:

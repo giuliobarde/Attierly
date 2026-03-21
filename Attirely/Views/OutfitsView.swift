@@ -4,6 +4,8 @@ import SwiftData
 struct OutfitsView: View {
     @Query(sort: \Outfit.createdAt, order: .reverse) private var allOutfits: [Outfit]
     @Query private var wardrobeItems: [ClothingItem]
+    @Query private var profiles: [UserProfile]
+    @Query private var styleSummaries: [StyleSummary]
     @State private var viewModel = OutfitViewModel()
     @Environment(\.modelContext) private var modelContext
     @Bindable var weatherViewModel: WeatherViewModel
@@ -91,6 +93,8 @@ struct OutfitsView: View {
         .onAppear {
             viewModel.modelContext = modelContext
             viewModel.weatherViewModel = weatherViewModel
+            viewModel.userProfile = profiles.first
+            viewModel.styleSummaryText = styleSummaries.first?.overallIdentity
         }
     }
 

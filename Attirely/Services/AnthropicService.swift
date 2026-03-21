@@ -251,7 +251,9 @@ struct AnthropicService {
         from items: [ClothingItem],
         occasion: String?,
         season: String?,
-        weatherContext: String? = nil
+        weatherContext: String? = nil,
+        comfortPreferences: String? = nil,
+        styleSummary: String? = nil
     ) async throws -> [OutfitSuggestionDTO] {
         guard items.count >= 2 else {
             throw AnthropicError.insufficientWardrobe
@@ -270,6 +272,17 @@ struct AnthropicService {
         }
 
         var contextLine = ""
+
+        // COMFORT CONSTRAINTS (override style preferences when conflicting)
+        if let comfortPreferences {
+            contextLine += "COMFORT CONSTRAINTS (override style preferences when conflicting):\n\(comfortPreferences)\n\n"
+        }
+
+        // Style summary as guidance
+        if let styleSummary {
+            contextLine += "USER STYLE PROFILE (use as guidance):\n\(styleSummary)\n\n"
+        }
+
         if let occasion { contextLine += "Occasion preference: \(occasion)\n" }
         if let season { contextLine += "Current season: \(season)\n" }
         if let weatherContext { contextLine += "Current weather:\n\(weatherContext)\n" }

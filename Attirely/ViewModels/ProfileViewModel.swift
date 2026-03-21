@@ -10,6 +10,10 @@ class ProfileViewModel {
     var locationError: String?
     var locationCityInput = ""
 
+    // Style summary editing
+    var isEditingStyleSummary = false
+    var editedStyleSummary = ""
+
     private var modelContext: ModelContext?
 
     // MARK: - Profile Singleton
@@ -103,6 +107,105 @@ class ProfileViewModel {
         profile.updatedAt = Date()
         locationCityInput = ""
         try? modelContext?.save()
+    }
+
+    // MARK: - Style & Comfort Questionnaire
+
+    func updateColdSensitivity(_ value: ColdSensitivity, profile: UserProfile) {
+        profile.coldSensitivityEnum = value
+        profile.updatedAt = Date()
+        try? modelContext?.save()
+        regenerateTemplateSummaryIfNeeded(profile: profile)
+    }
+
+    func updateHeatSensitivity(_ value: HeatSensitivity, profile: UserProfile) {
+        profile.heatSensitivityEnum = value
+        profile.updatedAt = Date()
+        try? modelContext?.save()
+        regenerateTemplateSummaryIfNeeded(profile: profile)
+    }
+
+    func updateBodyTempNotes(_ notes: String, profile: UserProfile) {
+        profile.bodyTempNotes = notes.isEmpty ? nil : notes
+        profile.updatedAt = Date()
+        try? modelContext?.save()
+        regenerateTemplateSummaryIfNeeded(profile: profile)
+    }
+
+    func updateLayeringPreference(_ value: LayeringPreference, profile: UserProfile) {
+        profile.layeringPreferenceEnum = value
+        profile.updatedAt = Date()
+        try? modelContext?.save()
+        regenerateTemplateSummaryIfNeeded(profile: profile)
+    }
+
+    func toggleStyle(_ style: String, profile: UserProfile) {
+        var styles = profile.selectedStylesArray
+        if let index = styles.firstIndex(of: style) {
+            styles.remove(at: index)
+        } else {
+            styles.append(style)
+        }
+        profile.selectedStylesArray = styles
+        profile.updatedAt = Date()
+        try? modelContext?.save()
+        regenerateTemplateSummaryIfNeeded(profile: profile)
+    }
+
+    func updateComfortVsAppearance(_ value: ComfortVsAppearance, profile: UserProfile) {
+        profile.comfortVsAppearanceEnum = value
+        profile.updatedAt = Date()
+        try? modelContext?.save()
+        regenerateTemplateSummaryIfNeeded(profile: profile)
+    }
+
+    func updateWeatherDressingApproach(_ value: WeatherDressingApproach, profile: UserProfile) {
+        profile.weatherDressingApproachEnum = value
+        profile.updatedAt = Date()
+        try? modelContext?.save()
+        regenerateTemplateSummaryIfNeeded(profile: profile)
+    }
+
+    // MARK: - Style Summary
+
+    func regenerateTemplateSummaryIfNeeded(profile: UserProfile) {
+        guard let context = modelContext else { return }
+        let descriptor = FetchDescriptor<StyleSummary>()
+        let existing = (try? context.fetch(descriptor))?.first
+
+        // Don't overwrite AI-enriched summary
+        if let existing, existing.isAIEnriched { return }
+
+        let summaryText = StyleSummaryTemplate.generate(from: profile)
+
+        let itemCount = ((try? context.fetchCount(FetchDescriptor<ClothingItem>())) ?? 0)
+        let outfitCount = ((try? context.fetchCount(FetchDescriptor<Outfit>())) ?? 0)
+
+        if let existing {
+            existing.overallIdentity = summaryText
+            existing.lastAnalyzedAt = Date()
+            existing.itemCountAtLastAnalysis = itemCount
+            existing.outfitCountAtLastAnalysis = outfitCount
+            existing.analysisVersion += 1
+        } else {
+            let summary = StyleSummary(
+                overallIdentity: summaryText,
+                itemCountAtLastAnalysis: itemCount,
+                outfitCountAtLastAnalysis: outfitCount
+            )
+            context.insert(summary)
+        }
+        try? context.save()
+    }
+
+    func updateSummaryText(_ text: String) {
+        guard let context = modelContext else { return }
+        let descriptor = FetchDescriptor<StyleSummary>()
+        guard let summary = (try? context.fetch(descriptor))?.first else { return }
+        summary.overallIdentity = text
+        summary.isUserEdited = true
+        summary.lastAnalyzedAt = Date()
+        try? context.save()
     }
 
     // MARK: - Analytics

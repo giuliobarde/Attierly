@@ -12,6 +12,12 @@ final class Outfit {
     var isFavorite: Bool
     var createdAt: Date
 
+    // Weather snapshot at creation/favorite time
+    var weatherTempAtCreation: Double?
+    var weatherFeelsLikeAtCreation: Double?
+    var seasonAtCreation: String?
+    var monthAtCreation: Int?
+
     @Relationship(deleteRule: .nullify, inverse: \ClothingItem.outfits)
     var items: [ClothingItem]
 
