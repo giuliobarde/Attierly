@@ -230,6 +230,13 @@ struct AnthropicService {
     - Avoid mixing more than 2 patterns
     - Keep formality level consistent across all items
     - Consider the provided occasion and season context if given
+    - When weather context is provided, prioritize weather-appropriate choices:
+      - Below 5°C: include outerwear, prioritize heavyweight fabrics, avoid linen/lightweight items
+      - 5–15°C: include a layer (jacket or cardigan), favor midweight fabrics
+      - 15–24°C: light layering optional, midweight fabrics suitable
+      - Above 24°C: prioritize lightweight fabrics (linen, cotton), minimize layers
+      - If precipitation chance > 50%, prefer items suitable for rain (avoid suede, prefer water-resistant outerwear)
+      - If UV index > 6, consider accessories like hats
 
     Return ONLY a valid JSON array. Each element must have:
     - "name": a short, evocative outfit name (e.g., "Weekend Casual", "Office Ready", "Evening Out")
@@ -243,7 +250,8 @@ struct AnthropicService {
     static func generateOutfits(
         from items: [ClothingItem],
         occasion: String?,
-        season: String?
+        season: String?,
+        weatherContext: String? = nil
     ) async throws -> [OutfitSuggestionDTO] {
         guard items.count >= 2 else {
             throw AnthropicError.insufficientWardrobe
@@ -264,6 +272,7 @@ struct AnthropicService {
         var contextLine = ""
         if let occasion { contextLine += "Occasion preference: \(occasion)\n" }
         if let season { contextLine += "Current season: \(season)\n" }
+        if let weatherContext { contextLine += "Current weather:\n\(weatherContext)\n" }
 
         let fullPrompt = outfitGenerationPrompt + "\n\nAvailable items:\n" + itemList + "\n" + contextLine
 

@@ -25,6 +25,7 @@ class OutfitViewModel {
     var isShowingItemPicker = false
 
     var modelContext: ModelContext?
+    var weatherViewModel: WeatherViewModel?
 
     // MARK: - List
 
@@ -98,7 +99,8 @@ class OutfitViewModel {
                 let suggestions = try await AnthropicService.generateOutfits(
                     from: allItems,
                     occasion: selectedOccasion,
-                    season: selectedSeason
+                    season: selectedSeason,
+                    weatherContext: weatherViewModel?.weatherContextString
                 )
 
                 var created: [Outfit] = []
@@ -134,5 +136,10 @@ class OutfitViewModel {
         selectedOccasion = nil
         selectedSeason = nil
         errorMessage = nil
+    }
+
+    func autoPopulateSeason() {
+        guard selectedSeason == nil else { return }
+        selectedSeason = weatherViewModel?.suggestedSeason
     }
 }

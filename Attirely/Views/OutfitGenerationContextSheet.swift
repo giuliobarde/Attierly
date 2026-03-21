@@ -3,6 +3,7 @@ import SwiftUI
 struct OutfitGenerationContextSheet: View {
     @Bindable var viewModel: OutfitViewModel
     let wardrobeItems: [ClothingItem]
+    var weatherViewModel: WeatherViewModel?
     @Environment(\.dismiss) private var dismiss
 
     private let occasions = ["Casual", "Smart Casual", "Business Casual", "Business", "Formal"]
@@ -11,7 +12,28 @@ struct OutfitGenerationContextSheet: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section("Context (Optional)") {
+                if let wvm = weatherViewModel, let snapshot = wvm.snapshot, !wvm.userOverridesWeather {
+                    Section("Current Weather") {
+                        HStack(spacing: 10) {
+                            Image(systemName: snapshot.current.conditionSymbol)
+                                .font(.title3)
+                                .foregroundStyle(Theme.champagne)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("\(String(format: "%.0f°C", snapshot.current.temperature)) — \(snapshot.current.conditionDescription)")
+                                    .font(.subheadline)
+                                    .foregroundStyle(Theme.primaryText)
+                                if let city = snapshot.locationName {
+                                    Text(city)
+                                        .font(.caption)
+                                        .foregroundStyle(Theme.secondaryText)
+                                }
+                            }
+                            Spacer()
+                        }
+                    }
+                }
+
+                Section {
                     Picker("Occasion", selection: $viewModel.selectedOccasion) {
                         Text("Any").tag(String?.none)
                         ForEach(occasions, id: \.self) { occasion in
@@ -24,6 +46,12 @@ struct OutfitGenerationContextSheet: View {
                         ForEach(seasons, id: \.self) { season in
                             Text(season).tag(Optional(season))
                         }
+                    }
+                } header: {
+                    Text("Context (Optional)")
+                } footer: {
+                    if weatherViewModel?.snapshot != nil, weatherViewModel?.userOverridesWeather != true {
+                        Text("Season auto-populated from current weather. You can override it.")
                     }
                 }
 
@@ -61,6 +89,9 @@ struct OutfitGenerationContextSheet: View {
             .background(Theme.screenBackground)
             .navigationTitle("AI Outfit Generator")
             .navigationBarTitleDisplayMode(.inline)
+            .onAppear {
+                viewModel.autoPopulateSeason()
+            }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") {

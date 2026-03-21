@@ -6,6 +6,7 @@ struct WardrobeView: View {
     @State private var viewModel = WardrobeViewModel()
     @State private var isShowingAddItem = false
     @Environment(\.modelContext) private var modelContext
+    @Bindable var weatherViewModel: WeatherViewModel
 
     private let gridColumns = [
         GridItem(.flexible(), spacing: 12),
@@ -76,6 +77,8 @@ struct WardrobeView: View {
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     HStack(spacing: 16) {
+                        WeatherWidgetView(viewModel: weatherViewModel)
+
                         Button {
                             isShowingAddItem = true
                         } label: {

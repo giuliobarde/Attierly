@@ -34,15 +34,19 @@ Attirely/
 │   ├── ClothingItemDTO.swift       # Codable struct (API parsing)
 │   ├── ScanSession.swift           # SwiftData @Model
 │   ├── Outfit.swift                # SwiftData @Model (outfit collection)
-│   └── OutfitSuggestionDTO.swift   # Codable struct (AI outfit parsing)
+│   ├── OutfitSuggestionDTO.swift   # Codable struct (AI outfit parsing)
+│   └── WeatherData.swift           # Ephemeral structs (current + hourly weather)
 ├── Services/
 │   ├── AnthropicService.swift      # Claude API calls (scan, duplicates, outfits)
 │   ├── ConfigManager.swift         # Reads API key from Config.plist
-│   └── ImageStorageService.swift   # Save/load images on disk
+│   ├── ImageStorageService.swift   # Save/load images on disk
+│   ├── LocationService.swift       # CoreLocation wrapper for user location
+│   └── WeatherService.swift        # WeatherKit + Open-Meteo fallback
 ├── ViewModels/
 │   ├── ScanViewModel.swift
 │   ├── WardrobeViewModel.swift
-│   └── OutfitViewModel.swift       # Outfit creation, generation, favorites
+│   ├── OutfitViewModel.swift       # Outfit creation, generation, favorites
+│   └── WeatherViewModel.swift      # Weather state, location, fetch coordination
 ├── Views/
 │   ├── MainTabView.swift           # TabView (Scan + Outfits + Wardrobe)
 │   ├── HomeView.swift
@@ -58,12 +62,15 @@ Attirely/
 │   ├── OutfitRowCard.swift         # Compact outfit card for list
 │   ├── OutfitGenerationContextSheet.swift  # AI generation context picker
 │   ├── ItemPickerSheet.swift       # Manual outfit item selection
-│   └── AddItemView.swift           # Manual wardrobe item entry form
+│   ├── AddItemView.swift           # Manual wardrobe item entry form
+│   ├── WeatherWidgetView.swift     # Compact toolbar weather indicator
+│   └── WeatherDetailSheet.swift    # Full weather modal with hourly forecast
 ├── Helpers/
 │   ├── Theme.swift                 # Brand design system: color tokens, ViewModifiers, ButtonStyles
 │   ├── ColorMapping.swift          # Color name → SwiftUI Color
 │   ├── ClothingItemDisplayable.swift  # Protocol for DTO + Model
-│   └── OutfitLayerOrder.swift      # Category → layer sort order
+│   ├── OutfitLayerOrder.swift      # Category → layer sort order
+│   └── SeasonHelper.swift          # Season detection from date/weather
 └── Resources/
     ├── Config.plist.example
     └── Assets.xcassets
@@ -85,7 +92,7 @@ Attirely/
 
 ### Services (`Services/`)
 - Handle all external I/O: API calls, file system, config reading.
-- `AnthropicService` is the only type that talks to the network. All API logic stays here.
+- `AnthropicService` handles all Claude API calls. `WeatherService` handles weather API calls (WeatherKit + Open-Meteo fallback). `LocationService` handles CoreLocation.
 - Return Swift types, not raw JSON. Throw typed errors, not generic ones.
 - Services should be stateless where possible. The view model owns state.
 
@@ -137,7 +144,16 @@ Attirely/
 - Text-only request (no image) — sends wardrobe item attributes with UUIDs
 - Returns JSON array of `OutfitSuggestionDTO` with `name`, `occasion`, `item_ids`, `reasoning`
 - Prompt enforces: 3-6 items per outfit, exactly one footwear, max 3-4 colors, max 2 patterns, consistent formality
+- Weather-adaptive rules: temperature-based layering/fabric guidance, precipitation awareness, UV consideration
+- Optional `weatherContext` parameter appended to prompt with current conditions
 - Uses 2048 max tokens (vs 4096 for vision analysis)
+
+### Weather API
+- **Primary**: Apple WeatherKit via `WeatherKit.WeatherService.shared.weather(for:)` — requires WeatherKit entitlement
+- **Fallback**: Open-Meteo free API — `GET https://api.open-meteo.com/v1/forecast` with lat/lon, no API key
+- Returns `WeatherSnapshot` (ephemeral struct, not persisted) with current conditions + 12-hour forecast
+- WMO weather codes mapped to SF Symbol names and condition descriptions
+- Location via CoreLocation `CLLocationManager` with "when in use" permission
 
 ### Prompt Location
 All prompts (clothing analysis, duplicate detection, outfit generation) live as string constants inside `AnthropicService`. If prompts grow more complex in later versions, extract to a `Prompts/` directory with one file per prompt.
@@ -164,7 +180,7 @@ All prompts (clothing analysis, duplicate detection, outfit generation) live as 
 - **No nested closures for async work.** Use `async/await`.
 - **No editing `.pbxproj` by hand.** File sync handles source files. Build settings go through Xcode's UI or `xcconfig` files.
 
-## Current State (v0.3.0) ✅
+## Current State (v0.3.1) ✅
 - Camera and photo library input
 - Claude vision API integration for clothing detection
 - Results displayed as cards with all attributes
@@ -175,26 +191,20 @@ All prompts (clothing analysis, duplicate detection, outfit generation) live as 
 - Save individual items or save all from scan results
 - Duplicate detection: pre-filter by category+color, Claude-based comparison, user confirmation
 - Tab-based navigation (Scan + Outfits + Wardrobe)
-- **Outfit generation**: manual creation via item picker, AI-powered generation with occasion/season context
+- **Outfit generation**: manual creation via item picker, AI-powered generation with occasion/season/weather context
 - **Outfit display**: card-based layout with items ordered by layer (Outerwear → Full Body → Top → Bottom → Footwear → Accessory)
 - **Outfit management**: favorites, deletion, AI reasoning display
 - Layer ordering via `OutfitLayerOrder` helper — deterministic sort by category, designed to be reusable by v0.5 visual compositor
 - **Manual item entry**: add wardrobe items manually via form with Pickers for all attributes, optional photo attachment
+- **Weather-aware outfits**: real-time weather via WeatherKit (+ Open-Meteo fallback), compact toolbar indicator on Outfits and Wardrobe pages, weather detail sheet with hourly forecast, weather context passed to AI outfit generation prompt, temperature-based layering/fabric rules, season auto-populated from weather
+- **Location**: CoreLocation "when in use" permission for weather data, reverse geocoding for city name display
+- **Weather override**: user can toggle "Ignore weather" to use manual season/occasion only
 - Error handling (missing key, network, API, empty results, insufficient wardrobe)
 - **Brand design system**: centralized `Theme.swift` with color tokens (Obsidian, Ivory, Stone, Champagne, Blush, Border), reusable ViewModifiers (`.themeCard()`, `.themePill()`, `.themeTag()`), and ButtonStyles (`.themePrimary`, `.themeSecondary`). CHAMPAGNE set as AccentColor globally. IVORY screen backgrounds, glass-tinted cards, and consistent typography applied across all views.
 
 ## Roadmap
 
-### v0.3.1 — Weather-Aware Outfit Recommendations (next)
-- Integrate Apple WeatherKit (or a free weather API) to fetch current conditions and forecast for the user's location
-- Pass weather context (temperature, conditions, humidity, wind) to the outfit generation prompt alongside occasion/season
-- Weather-adaptive prompt guidance: suggest lighter fabrics and fewer layers in heat, heavier weight and outerwear in cold, water-resistant items in rain
-- Display current weather summary in the `OutfitGenerationContextSheet` so the user sees what context the AI is working with
-- Auto-populate the season picker based on current date/hemisphere
-- Optional: let the user override or ignore weather context if they prefer manual season selection
-- Requires `CoreLocation` for user location (request "when in use" permission) and either WeatherKit entitlement or a third-party weather API key in `Config.plist`
-
-### v0.4 — Image Extraction & Confidence
+### v0.4 — Image Extraction & Confidence (next)
 - Crop/extract individual items from group photos into per-item images stored separately from the source scan image
 - Use Apple Vision framework (`VNGenerateForegroundInstanceMaskRequest`) for background removal to produce clean cutouts on transparent backgrounds
 - Potentially use Vision framework for object detection bounding boxes before sending to Claude
@@ -283,6 +293,26 @@ OutfitSuggestionDTO (Codable struct) — IMPLEMENTED
 ├── itemIDs: [String]             # CodingKey: "item_ids"
 ├── reasoning: String
 └── Used only for AI response parsing, then converted to Outfit
+```
+
+CurrentWeather (struct, ephemeral) — IMPLEMENTED
+├── temperature, feelsLike: Double (Celsius)
+├── conditionDescription, conditionSymbol: String
+├── humidity, precipitationChance: Double (0.0–1.0)
+├── windSpeed: Double (km/h)
+└── uvIndex: Int
+
+HourlyForecast (struct, Identifiable, ephemeral) — IMPLEMENTED
+├── hour: Date
+├── temperature: Double
+├── conditionDescription, conditionSymbol: String
+└── precipitationChance: Double
+
+WeatherSnapshot (struct, ephemeral) — IMPLEMENTED
+├── current: CurrentWeather
+├── hourlyForecast: [HourlyForecast]
+├── fetchedAt: Date
+└── locationName: String?
 ```
 
 ### Planned Model Extensions

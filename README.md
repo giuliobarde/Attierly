@@ -8,7 +8,8 @@ Attirely is an iOS app that uses AI-powered vision to identify and analyze cloth
 - **Digital wardrobe** — persistent storage with grid/list views, category filtering, search, and full item editing
 - **Manual item entry** — add items to your wardrobe manually via a form with optional photo attachment
 - **Duplicate detection** — pre-filters by category+color, then uses Claude to classify same/similar/different items
-- **Outfit generation** — create outfits manually by picking items, or let AI suggest up to 3 coordinated outfits based on occasion and season
+- **Outfit generation** — create outfits manually by picking items, or let AI suggest up to 3 coordinated outfits based on occasion, season, and current weather
+- **Weather-aware outfits** — real-time weather via WeatherKit (Open-Meteo fallback), compact toolbar indicator, weather detail sheet with hourly forecast, AI adapts outfit suggestions to temperature, precipitation, and conditions
 - **Outfit display** — card-based layout with items ordered by layer (outerwear → tops → bottoms → footwear → accessories)
 - **Favorites** — star outfits for quick access
 - **Brand design system** — centralized theme with Obsidian/Ivory/Stone/Champagne/Blush palette, reusable card/pill/tag modifiers, and consistent typography across all views
@@ -45,15 +46,19 @@ Attirely/
 │   ├── ClothingItemDTO.swift          # API response parsing
 │   ├── ScanSession.swift              # Scan session grouping
 │   ├── Outfit.swift                   # Outfit collection model
-│   └── OutfitSuggestionDTO.swift      # AI outfit response parsing
+│   ├── OutfitSuggestionDTO.swift      # AI outfit response parsing
+│   └── WeatherData.swift              # Weather data structs (ephemeral)
 ├── Services/
 │   ├── AnthropicService.swift         # Claude API (scan, duplicates, outfits)
 │   ├── ConfigManager.swift            # API key configuration
-│   └── ImageStorageService.swift      # Disk image storage
+│   ├── ImageStorageService.swift      # Disk image storage
+│   ├── LocationService.swift          # CoreLocation wrapper
+│   └── WeatherService.swift           # WeatherKit + Open-Meteo fallback
 ├── ViewModels/
 │   ├── ScanViewModel.swift            # Scan flow state
 │   ├── WardrobeViewModel.swift        # Wardrobe filtering/display
-│   └── OutfitViewModel.swift          # Outfit creation/generation/favorites
+│   ├── OutfitViewModel.swift          # Outfit creation/generation/favorites
+│   └── WeatherViewModel.swift         # Weather state management
 ├── Views/
 │   ├── MainTabView.swift              # Tab bar (Scan + Outfits + Wardrobe)
 │   ├── HomeView.swift                 # Scan tab
@@ -69,12 +74,15 @@ Attirely/
 │   ├── OutfitRowCard.swift            # Compact outfit list card
 │   ├── OutfitGenerationContextSheet.swift  # AI generation options
 │   ├── ItemPickerSheet.swift          # Manual outfit item picker
-│   └── AddItemView.swift             # Manual wardrobe item entry
+│   ├── AddItemView.swift             # Manual wardrobe item entry
+│   ├── WeatherWidgetView.swift        # Compact toolbar weather indicator
+│   └── WeatherDetailSheet.swift       # Weather detail modal
 ├── Helpers/
 │   ├── Theme.swift                    # Brand design system (colors, modifiers, styles)
 │   ├── ColorMapping.swift             # Color name → SwiftUI Color
 │   ├── ClothingItemDisplayable.swift  # Protocol for DTO + Model
-│   └── OutfitLayerOrder.swift         # Category layer sorting
+│   ├── OutfitLayerOrder.swift         # Category layer sorting
+│   └── SeasonHelper.swift             # Season detection from date/weather
 └── Resources/
     ├── Config.plist.example           # API key template
     └── Assets.xcassets                # App assets

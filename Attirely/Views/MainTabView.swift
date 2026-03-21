@@ -1,6 +1,8 @@
 import SwiftUI
 
 struct MainTabView: View {
+    @State private var weatherViewModel = WeatherViewModel()
+
     init() {
         let tabBarAppearance = UITabBarAppearance()
         tabBarAppearance.configureWithDefaultBackground()
@@ -31,11 +33,14 @@ struct MainTabView: View {
                 HomeView()
             }
             Tab("Outfits", systemImage: "sparkles") {
-                OutfitsView()
+                OutfitsView(weatherViewModel: weatherViewModel)
             }
             Tab("Wardrobe", systemImage: "tshirt") {
-                WardrobeView()
+                WardrobeView(weatherViewModel: weatherViewModel)
             }
+        }
+        .onAppear {
+            weatherViewModel.fetchWeather()
         }
     }
 }

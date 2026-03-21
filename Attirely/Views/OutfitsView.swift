@@ -6,6 +6,7 @@ struct OutfitsView: View {
     @Query private var wardrobeItems: [ClothingItem]
     @State private var viewModel = OutfitViewModel()
     @Environment(\.modelContext) private var modelContext
+    @Bindable var weatherViewModel: WeatherViewModel
 
     var body: some View {
         NavigationStack {
@@ -45,6 +46,10 @@ struct OutfitsView: View {
                 }
 
                 ToolbarItem(placement: .topBarTrailing) {
+                    WeatherWidgetView(viewModel: weatherViewModel)
+                }
+
+                ToolbarItem(placement: .topBarTrailing) {
                     Menu {
                         Button {
                             viewModel.isShowingItemPicker = true
@@ -73,7 +78,8 @@ struct OutfitsView: View {
         .sheet(isPresented: $viewModel.isShowingGenerateSheet) {
             OutfitGenerationContextSheet(
                 viewModel: viewModel,
-                wardrobeItems: wardrobeItems
+                wardrobeItems: wardrobeItems,
+                weatherViewModel: weatherViewModel
             )
         }
         .sheet(isPresented: $viewModel.isShowingItemPicker) {
@@ -84,6 +90,7 @@ struct OutfitsView: View {
         }
         .onAppear {
             viewModel.modelContext = modelContext
+            viewModel.weatherViewModel = weatherViewModel
         }
     }
 
