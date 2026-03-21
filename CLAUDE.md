@@ -35,7 +35,8 @@ Attirely/
 │   ├── ScanSession.swift           # SwiftData @Model
 │   ├── Outfit.swift                # SwiftData @Model (outfit collection)
 │   ├── OutfitSuggestionDTO.swift   # Codable struct (AI outfit parsing)
-│   └── WeatherData.swift           # Ephemeral structs (current + hourly weather)
+│   ├── WeatherData.swift           # Ephemeral structs (current + hourly weather)
+│   └── UserProfile.swift           # SwiftData @Model (user prefs, profile)
 ├── Services/
 │   ├── AnthropicService.swift      # Claude API calls (scan, duplicates, outfits)
 │   ├── ConfigManager.swift         # Reads API key from Config.plist
@@ -46,9 +47,10 @@ Attirely/
 │   ├── ScanViewModel.swift
 │   ├── WardrobeViewModel.swift
 │   ├── OutfitViewModel.swift       # Outfit creation, generation, favorites
-│   └── WeatherViewModel.swift      # Weather state, location, fetch coordination
+│   ├── WeatherViewModel.swift      # Weather state, location, fetch coordination
+│   └── ProfileViewModel.swift      # Profile state, analytics, geocoding
 ├── Views/
-│   ├── MainTabView.swift           # TabView (Scan + Outfits + Wardrobe)
+│   ├── MainTabView.swift           # TabView (Scan + Outfits + Wardrobe + Profile)
 │   ├── HomeView.swift
 │   ├── ResultsView.swift
 │   ├── ClothingItemCard.swift
@@ -64,13 +66,16 @@ Attirely/
 │   ├── ItemPickerSheet.swift       # Manual outfit item selection
 │   ├── AddItemView.swift           # Manual wardrobe item entry form
 │   ├── WeatherWidgetView.swift     # Compact toolbar weather indicator
-│   └── WeatherDetailSheet.swift    # Full weather modal with hourly forecast
+│   ├── WeatherDetailSheet.swift    # Full weather modal with hourly forecast
+│   ├── ProfileView.swift           # Profile tab (details, prefs, analytics)
+│   └── WardrobeAnalyticsView.swift # Swift Charts wardrobe analytics
 ├── Helpers/
 │   ├── Theme.swift                 # Brand design system: color tokens, ViewModifiers, ButtonStyles
 │   ├── ColorMapping.swift          # Color name → SwiftUI Color
 │   ├── ClothingItemDisplayable.swift  # Protocol for DTO + Model
 │   ├── OutfitLayerOrder.swift      # Category → layer sort order
-│   └── SeasonHelper.swift          # Season detection from date/weather
+│   ├── SeasonHelper.swift          # Season detection from date/weather
+│   └── TemperatureFormatter.swift  # °C/°F formatting helper
 └── Resources/
     ├── Config.plist.example
     └── Assets.xcassets
@@ -84,7 +89,7 @@ Attirely/
 ## Architecture Rules (MVVM)
 
 ### Models (`Models/`)
-- `ClothingItem` is a SwiftData `@Model` class for persistence. `ClothingItemDTO` is a `Codable` struct for API parsing. `ScanSession` and `Outfit` are SwiftData `@Model`s. `OutfitSuggestionDTO` is a `Codable` struct for AI outfit response parsing.
+- `ClothingItem` is a SwiftData `@Model` class for persistence. `ClothingItemDTO` is a `Codable` struct for API parsing. `ScanSession`, `Outfit`, and `UserProfile` are SwiftData `@Model`s. `OutfitSuggestionDTO` is a `Codable` struct for AI outfit response parsing.
 - No business logic, no API calls, no UI code.
 - DTOs own their `CodingKeys` for JSON mapping (snake_case API ↔ camelCase Swift).
 - `ClothingItem` uses `itemDescription` (not `description`) to avoid NSObject conflict.
@@ -180,17 +185,17 @@ All prompts (clothing analysis, duplicate detection, outfit generation) live as 
 - **No nested closures for async work.** Use `async/await`.
 - **No editing `.pbxproj` by hand.** File sync handles source files. Build settings go through Xcode's UI or `xcconfig` files.
 
-## Current State (v0.3.1) ✅
+## Current State (v0.4) ✅
 - Camera and photo library input
 - Claude vision API integration for clothing detection
 - Results displayed as cards with all attributes
-- SwiftData persistence for clothing items, scan sessions, and outfits
-- Images stored on disk (Documents/clothing-images/ and Documents/scan-images/)
+- SwiftData persistence for clothing items, scan sessions, outfits, and user profile
+- Images stored on disk (Documents/clothing-images/, Documents/scan-images/, Documents/profile-images/)
 - Wardrobe view with grid/list toggle and category filtering
 - Item detail/edit view with all fields editable, AI originals shown as reference
 - Save individual items or save all from scan results
 - Duplicate detection: pre-filter by category+color, Claude-based comparison, user confirmation
-- Tab-based navigation (Scan + Outfits + Wardrobe)
+- Tab-based navigation (Scan + Outfits + Wardrobe + Profile)
 - **Outfit generation**: manual creation via item picker, AI-powered generation with occasion/season/weather context
 - **Outfit display**: card-based layout with items ordered by layer (Outerwear → Full Body → Top → Bottom → Footwear → Accessory)
 - **Outfit management**: favorites, deletion, AI reasoning display
@@ -199,12 +204,17 @@ All prompts (clothing analysis, duplicate detection, outfit generation) live as 
 - **Weather-aware outfits**: real-time weather via WeatherKit (+ Open-Meteo fallback), compact toolbar indicator on Outfits and Wardrobe pages, weather detail sheet with hourly forecast, weather context passed to AI outfit generation prompt, temperature-based layering/fabric rules, season auto-populated from weather
 - **Location**: CoreLocation "when in use" permission for weather data, reverse geocoding for city name display
 - **Weather override**: user can toggle "Ignore weather" to use manual season/occasion only
+- **Profile page**: 4th tab with user name, profile photo (via PhotosPicker), and item/outfit count summary
+- **User preferences**: temperature unit (°C/°F) applied across all weather displays, theme preference (stored, switching not yet implemented), custom location override with city geocoding
+- **Wardrobe analytics dashboard**: Swift Charts — category composition (horizontal bar), formality breakdown (donut/sector chart), color distribution (swatch grid with counts). Empty state for < 3 items.
+- **Temperature formatting**: centralized `TemperatureFormatter` helper, all weather views respect user's unit preference. AI prompt always uses Celsius internally.
+- **Location override**: user can set a custom city; forward geocoding converts to coordinates; weather fetches use override location when enabled
 - Error handling (missing key, network, API, empty results, insufficient wardrobe)
 - **Brand design system**: centralized `Theme.swift` with color tokens (Obsidian, Ivory, Stone, Champagne, Blush, Border), reusable ViewModifiers (`.themeCard()`, `.themePill()`, `.themeTag()`), and ButtonStyles (`.themePrimary`, `.themeSecondary`). CHAMPAGNE set as AccentColor globally. IVORY screen backgrounds, glass-tinted cards, and consistent typography applied across all views.
 
 ## Roadmap
 
-### v0.4 — Style Intelligence (next)
+### v0.5 — Style Intelligence (next)
 - **AI Style Agent**: analyze the user's full wardrobe to generate a written style profile summary
 - Identifies dominant aesthetics (e.g., "minimalist", "streetwear", "classic"), color palettes the user gravitates toward, formality tendencies, pattern preferences, and gaps/opportunities ("you have many casual tops but few smart-casual options")
 - **Wardrobe analytics**: color distribution, formality breakdown, category composition stats, seasonal coverage gaps
@@ -213,13 +223,7 @@ All prompts (clothing analysis, duplicate detection, outfit generation) live as 
 - **Auto re-analysis**: triggered automatically whenever the user manually creates an outfit (manual creation signals intentional style preference). Also triggerable manually via a "Re-analyze" button
 - **Incremental analysis**: re-analysis receives the previous style summary alongside new wardrobe data. The previous analysis is weighted more heavily than new data to maintain stability — style identity evolves gradually, not with every new item. The prompt instructs the AI to treat the existing summary as the baseline and only adjust where new evidence is compelling
 - Requires a new SwiftData model for style summary persistence (summary text, last analyzed date, analysis version/count)
-
-### v0.5 — Profile Page
-- **Profile page** accessible from a new tab or nav element with user details (name, profile photo)
-- **Preferences**: location setting (manual override for weather), temperature unit (°C / °F), theme preference (light/dark/system)
-- **Wardrobe analytics dashboard**: visual charts for color distribution, formality breakdown (pie/bar), category composition
-- **Style summary display**: view and edit the AI-generated style profile from v0.4
-- Requires a `UserProfile` SwiftData model for user details and preferences persistence
+- **Style summary display**: Add the AI-generated style profile to the profile page from v0.4 so the user can view and edit it
 
 ### v0.6 — Image Extraction & Confidence
 - Crop/extract individual items from group photos into per-item images stored separately from the source scan image
@@ -330,16 +334,29 @@ WeatherSnapshot (struct, ephemeral) — IMPLEMENTED
 ├── hourlyForecast: [HourlyForecast]
 ├── fetchedAt: Date
 └── locationName: String?
+
+UserProfile (SwiftData @Model) — IMPLEMENTED
+├── id: UUID
+├── name: String
+├── profileImagePath: String?     # relative path to profile photo on disk
+├── temperatureUnitRaw: String    # "°C" or "°F" (TemperatureUnit enum)
+├── themePreferenceRaw: String    # "System"/"Light"/"Dark" (ThemePreference enum)
+├── isLocationOverrideEnabled: Bool
+├── locationOverrideName: String? # display city name
+├── locationOverrideLat: Double?  # geocoded latitude
+├── locationOverrideLon: Double?  # geocoded longitude
+├── createdAt: Date
+└── updatedAt: Date
 ```
 
 ### Planned Model Extensions
 
 ```
-ClothingItem — v0.4 additions
+ClothingItem — v0.6 additions
 ├── cutoutImagePath: String?      # path to background-removed cutout (transparent PNG)
 └── attributeConfidence: String?  # JSON map of field name → "observed"/"inferred"/"assumed"
 
-ClothingItem — v0.5 additions
+ClothingItem — v0.7 additions
 └── flatLayImagePath: String?     # path to AI-generated or user-provided flat-lay image
 ```
 

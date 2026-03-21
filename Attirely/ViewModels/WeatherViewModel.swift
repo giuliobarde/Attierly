@@ -15,6 +15,9 @@ class WeatherViewModel {
     var loadState: WeatherLoadState = .idle
     var isShowingDetail = false
     var userOverridesWeather = false
+    var temperatureUnit: TemperatureUnit = .celsius
+    var overrideLocation: CLLocation?
+    var overrideLocationName: String?
 
     private let locationService = LocationService()
 
@@ -28,6 +31,7 @@ class WeatherViewModel {
     var weatherContextString: String? {
         guard !userOverridesWeather, let s = snapshot else { return nil }
         let c = s.current
+        // Always send Celsius to AI for consistency
         return """
         Weather: \(c.conditionDescription), \(String(format: "%.0f°C", c.temperature)) (feels like \(String(format: "%.0f°C", c.feelsLike)))
         Humidity: \(Int(c.humidity * 100))%
@@ -53,13 +57,22 @@ class WeatherViewModel {
 
         Task {
             do {
-                let location = try await locationService.requestCurrentLocation()
-                loadState = .loading
+                let location: CLLocation
+                let cityName: String?
 
+                if let override = overrideLocation {
+                    location = override
+                    cityName = overrideLocationName
+                } else {
+                    location = try await locationService.requestCurrentLocation()
+                    loadState = .loading
+                    cityName = await LocationService.reverseGeocode(location: location)
+                }
+
+                loadState = .loading
                 let result = await WeatherService.fetch(location: location)
                 switch result {
                 case .success(let snapshot):
-                    let cityName = await LocationService.reverseGeocode(location: location)
                     let enriched = WeatherSnapshot(
                         current: snapshot.current,
                         hourlyForecast: snapshot.hourlyForecast,

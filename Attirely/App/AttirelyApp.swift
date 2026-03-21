@@ -9,6 +9,6 @@ struct AttirelyApp: App {
                 .background(Theme.screenBackground)
                 .tint(Theme.champagne)
         }
-        .modelContainer(for: [ClothingItem.self, ScanSession.self, Outfit.self])
+        .modelContainer(for: [ClothingItem.self, ScanSession.self, Outfit.self, UserProfile.self])
     }
 }

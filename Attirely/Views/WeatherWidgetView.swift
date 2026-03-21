@@ -20,7 +20,7 @@ struct WeatherWidgetView: View {
                     Image(systemName: snapshot.current.conditionSymbol)
                         .font(.caption)
                         .foregroundStyle(Theme.champagne)
-                    Text(String(format: "%.0f°", snapshot.current.temperature))
+                    Text(TemperatureFormatter.format(snapshot.current.temperature, unit: viewModel.temperatureUnit, includeUnit: false))
                         .font(.caption)
                         .fontWeight(.medium)
                         .foregroundStyle(Theme.primaryText)

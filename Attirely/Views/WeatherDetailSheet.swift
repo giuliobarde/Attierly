@@ -41,7 +41,7 @@ struct WeatherDetailSheet: View {
                         Image(systemName: snapshot.current.conditionSymbol)
                             .font(.largeTitle)
                             .foregroundStyle(Theme.champagne)
-                        Text(String(format: "%.0f°C", snapshot.current.temperature))
+                        Text(TemperatureFormatter.format(snapshot.current.temperature, unit: viewModel.temperatureUnit))
                             .font(.largeTitle)
                             .fontWeight(.medium)
                             .foregroundStyle(Theme.primaryText)
@@ -61,7 +61,7 @@ struct WeatherDetailSheet: View {
             Divider()
 
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
-                detailCell("Feels Like", String(format: "%.0f°C", snapshot.current.feelsLike))
+                detailCell("Feels Like", TemperatureFormatter.format(snapshot.current.feelsLike, unit: viewModel.temperatureUnit))
                 detailCell("Humidity", "\(Int(snapshot.current.humidity * 100))%")
                 detailCell("Wind", String(format: "%.0f km/h", snapshot.current.windSpeed))
                 detailCell("Precipitation", "\(Int(snapshot.current.precipitationChance * 100))%")
@@ -101,7 +101,7 @@ struct WeatherDetailSheet: View {
             Image(systemName: forecast.conditionSymbol)
                 .font(.subheadline)
                 .foregroundStyle(Theme.champagne)
-            Text(String(format: "%.0f°", forecast.temperature))
+            Text(TemperatureFormatter.format(forecast.temperature, unit: viewModel.temperatureUnit, includeUnit: false))
                 .font(.caption)
                 .fontWeight(.medium)
                 .foregroundStyle(Theme.primaryText)

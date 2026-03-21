@@ -12,6 +12,9 @@ Attirely is an iOS app that uses AI-powered vision to identify and analyze cloth
 - **Weather-aware outfits** — real-time weather via WeatherKit (Open-Meteo fallback), compact toolbar indicator, weather detail sheet with hourly forecast, AI adapts outfit suggestions to temperature, precipitation, and conditions
 - **Outfit display** — card-based layout with items ordered by layer (outerwear → tops → bottoms → footwear → accessories)
 - **Favorites** — star outfits for quick access
+- **Profile page** — user name, profile photo, and wardrobe summary stats
+- **User preferences** — temperature unit (°C/°F) applied across all weather displays, theme preference (stored for future use), custom location override with city geocoding
+- **Wardrobe analytics** — category composition (bar chart), formality breakdown (donut chart), and color distribution (swatch grid) powered by Swift Charts
 - **Brand design system** — centralized theme with Obsidian/Ivory/Stone/Champagne/Blush palette, reusable card/pill/tag modifiers, and consistent typography across all views
 
 ## Setup
@@ -47,7 +50,8 @@ Attirely/
 │   ├── ScanSession.swift              # Scan session grouping
 │   ├── Outfit.swift                   # Outfit collection model
 │   ├── OutfitSuggestionDTO.swift      # AI outfit response parsing
-│   └── WeatherData.swift              # Weather data structs (ephemeral)
+│   ├── WeatherData.swift              # Weather data structs (ephemeral)
+│   └── UserProfile.swift             # User profile + preferences model
 ├── Services/
 │   ├── AnthropicService.swift         # Claude API (scan, duplicates, outfits)
 │   ├── ConfigManager.swift            # API key configuration
@@ -58,9 +62,10 @@ Attirely/
 │   ├── ScanViewModel.swift            # Scan flow state
 │   ├── WardrobeViewModel.swift        # Wardrobe filtering/display
 │   ├── OutfitViewModel.swift          # Outfit creation/generation/favorites
-│   └── WeatherViewModel.swift         # Weather state management
+│   ├── WeatherViewModel.swift         # Weather state management
+│   └── ProfileViewModel.swift        # Profile state + analytics
 ├── Views/
-│   ├── MainTabView.swift              # Tab bar (Scan + Outfits + Wardrobe)
+│   ├── MainTabView.swift              # Tab bar (Scan + Outfits + Wardrobe + Profile)
 │   ├── HomeView.swift                 # Scan tab
 │   ├── ResultsView.swift              # Scan results display
 │   ├── ClothingItemCard.swift         # Full item attribute card
@@ -76,13 +81,16 @@ Attirely/
 │   ├── ItemPickerSheet.swift          # Manual outfit item picker
 │   ├── AddItemView.swift             # Manual wardrobe item entry
 │   ├── WeatherWidgetView.swift        # Compact toolbar weather indicator
-│   └── WeatherDetailSheet.swift       # Weather detail modal
+│   ├── WeatherDetailSheet.swift       # Weather detail modal
+│   ├── ProfileView.swift             # Profile tab (details, prefs, analytics)
+│   └── WardrobeAnalyticsView.swift   # Swift Charts wardrobe analytics
 ├── Helpers/
 │   ├── Theme.swift                    # Brand design system (colors, modifiers, styles)
 │   ├── ColorMapping.swift             # Color name → SwiftUI Color
 │   ├── ClothingItemDisplayable.swift  # Protocol for DTO + Model
 │   ├── OutfitLayerOrder.swift         # Category layer sorting
-│   └── SeasonHelper.swift             # Season detection from date/weather
+│   ├── SeasonHelper.swift             # Season detection from date/weather
+│   └── TemperatureFormatter.swift    # °C/°F formatting helper
 └── Resources/
     ├── Config.plist.example           # API key template
     └── Assets.xcassets                # App assets

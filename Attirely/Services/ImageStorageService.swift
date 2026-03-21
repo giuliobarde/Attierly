@@ -14,6 +14,7 @@ enum ImageStorageError: LocalizedError {
 struct ImageStorageService {
     private static let clothingImagesDir = "clothing-images"
     private static let scanImagesDir = "scan-images"
+    private static let profileImagesDir = "profile-images"
 
     static func saveClothingImage(_ image: UIImage, id: UUID) throws -> String {
         try save(image, directory: clothingImagesDir, filename: "\(id.uuidString).jpg")
@@ -21,6 +22,10 @@ struct ImageStorageService {
 
     static func saveScanImage(_ image: UIImage, id: UUID) throws -> String {
         try save(image, directory: scanImagesDir, filename: "\(id.uuidString).jpg")
+    }
+
+    static func saveProfileImage(_ image: UIImage, id: UUID) throws -> String {
+        try save(image, directory: profileImagesDir, filename: "\(id.uuidString).jpg")
     }
 
     static func loadImage(relativePath: String) -> UIImage? {
