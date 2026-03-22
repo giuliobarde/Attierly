@@ -35,11 +35,12 @@ Attirely/
 │   ├── ScanSession.swift           # SwiftData @Model
 │   ├── Outfit.swift                # SwiftData @Model (outfit collection + weather snapshot)
 │   ├── OutfitSuggestionDTO.swift   # Codable struct (AI outfit parsing)
+│   ├── StyleAnalysisDTO.swift      # Codable structs (AI style analysis parsing)
 │   ├── WeatherData.swift           # Ephemeral structs (current + hourly weather)
 │   ├── UserProfile.swift           # SwiftData @Model (user prefs, profile, style questionnaire)
 │   └── StyleSummary.swift          # SwiftData @Model (template/AI style summary)
 ├── Services/
-│   ├── AnthropicService.swift      # Claude API calls (scan, duplicates, outfits)
+│   ├── AnthropicService.swift      # Claude API calls (scan, duplicates, outfits, style analysis)
 │   ├── ConfigManager.swift         # Reads API key from Config.plist
 │   ├── ImageStorageService.swift   # Save/load images on disk
 │   ├── LocationService.swift       # CoreLocation wrapper for user location
@@ -49,7 +50,8 @@ Attirely/
 │   ├── WardrobeViewModel.swift
 │   ├── OutfitViewModel.swift       # Outfit creation, generation, favorites
 │   ├── WeatherViewModel.swift      # Weather state, location, fetch coordination
-│   └── ProfileViewModel.swift      # Profile state, analytics, geocoding
+│   ├── ProfileViewModel.swift      # Profile state, analytics, geocoding
+│   └── StyleViewModel.swift        # AI style analysis state, debounce, merge
 ├── Views/
 │   ├── MainTabView.swift           # TabView (Scan + Outfits + Wardrobe + Profile)
 │   ├── HomeView.swift
@@ -91,7 +93,7 @@ Attirely/
 ## Architecture Rules (MVVM)
 
 ### Models (`Models/`)
-- `ClothingItem` is a SwiftData `@Model` class for persistence. `ClothingItemDTO` is a `Codable` struct for API parsing. `ScanSession`, `Outfit`, and `UserProfile` are SwiftData `@Model`s. `OutfitSuggestionDTO` is a `Codable` struct for AI outfit response parsing.
+- `ClothingItem` is a SwiftData `@Model` class for persistence. `ClothingItemDTO` is a `Codable` struct for API parsing. `ScanSession`, `Outfit`, `UserProfile`, and `StyleSummary` are SwiftData `@Model`s. `OutfitSuggestionDTO` and `StyleAnalysisDTO` are `Codable` structs for AI response parsing.
 - No business logic, no API calls, no UI code.
 - DTOs own their `CodingKeys` for JSON mapping (snake_case API ↔ camelCase Swift).
 - `ClothingItem` uses `itemDescription` (not `description`) to avoid NSObject conflict.
@@ -200,7 +202,7 @@ All prompts (clothing analysis, duplicate detection, outfit generation, style an
 - **No nested closures for async work.** Use `async/await`.
 - **No editing `.pbxproj` by hand.** File sync handles source files. Build settings go through Xcode's UI or `xcconfig` files.
 
-## Current State (v0.5a) ✅
+## Current State (v0.5b) ✅
 - Camera and photo library input
 - Claude vision API integration for clothing detection
 - Results displayed as cards with all attributes
@@ -231,6 +233,11 @@ All prompts (clothing analysis, duplicate detection, outfit generation, style an
 - **Template-based style summary**: `StyleSummaryTemplate` helper generates a readable style summary from questionnaire answers via deterministic string interpolation (no LLM). Auto-generated on questionnaire save, displayed below questionnaire with manual edit support. `StyleSummary` SwiftData model tracks summary state (`isUserEdited`, `isAIEnriched`).
 - **Weather snapshot on outfits**: `Outfit` captures current temperature, feels-like, season, and month at creation (manual and AI-generated). Backfills weather on favorite if not captured at creation.
 - **Comfort-aware outfit generation**: AI outfit generation prompt injects user's comfort preferences (cold/heat sensitivity, layering, weather dressing approach) as hard constraints above style guidance. Style summary appended as context when available.
+- **AI style analysis**: `AnthropicService.analyzeStyle()` sends wardrobe items + outfit compositions (tiered by signal: favorited > manual > AI-generated) to Claude for intelligent style profiling. Returns `StyleAnalysisDTO` with overall identity, style modes (name/description/colorPalette/formality), temporal notes, gap observations, and weather behavior patterns.
+- **StyleViewModel**: manages analysis state with debounce (30s interval + item/outfit count deltas). Auto-triggers on manual outfit creation, outfit favoriting, and item scanning. Always allows manual "Re-analyze" via force mode. Merges AI results into `StyleSummary` model (incremental updates preserve non-null fields, increment analysis version).
+- **Enriched style profile display**: Profile page shows AI-enriched summary with style mode cards (name, formality tag, description, color palette swatches via `ColorMapping`), seasonal patterns, gap observations, weather style sections. Non-enriched state shows progress bar toward 8-item threshold + "Analyze My Style" button.
+- **Richer outfit generation context**: when AI-enriched summary exists, outfit generation receives full style context (overall identity + each mode's name/formality/description/colors + weather behavior) instead of just the overall identity text.
+- **Cross-VM style triggers**: `StyleViewModel` shared across tabs via `MainTabView`. `ScanViewModel` triggers analysis after saving items. `OutfitViewModel` triggers after manual outfit creation, favoriting, and AI generation.
 
 ## Roadmap
 
@@ -248,60 +255,14 @@ All prompts (clothing analysis, duplicate detection, outfit generation, style an
 - Weather snapshot capture on outfit creation/favoriting
 - Comfort preferences injected as hard constraints in outfit generation prompt
 
-#### v0.5b — AI Style Analysis
-- **`AnthropicService.analyzeStyle()`**: new API method for style analysis
-- **Initial analysis**: triggered when wardrobe crosses a threshold (~8–10 items). Sends all wardrobe item attributes + all outfit compositions (favorited outfits emphasized as highest-weight signal, then manual outfits, then AI-generated). Questionnaire-generated summary included as "user-declared ground truth — do not contradict."
-- **Incremental analysis**: triggered by debounced wardrobe changes (see trigger rules below). Sends previous summary as stable baseline + only delta (new items, new outfits since last analysis). Prompt instructs AI to treat existing summary as baseline and only adjust where new evidence is compelling.
-- **Style modes**: the AI detects distinct style modes organically from the data (especially from favorited outfit clusters). Not forced to a fixed count — some users have one cohesive style, others have 3–4 modes. Each mode has its own name, description, color palette, and formality level.
-- **Temporal trends / phases**: AI notes any directional shifts in recent additions or recent favorites vs. older ones. Framed as observations, not identity rewrites (e.g., "Recent additions lean toward relaxed tailoring compared to earlier casual streetwear pieces").
-- **Weather-relative behavior**: outfit weather snapshots (temperature + month) included in analysis. AI detects seasonal-relative dressing patterns (e.g., "Dresses warmer than temperature suggests in early spring after winter. Acclimates fully by mid-season."). This behavioral pattern is stored in the summary and fed into outfit generation.
-- **Gap observations**: AI identifies wardrobe gaps and opportunities (e.g., "Many casual tops but few smart-casual options").
-
-#### Style Analysis Trigger Rules
-Auto-trigger re-analysis when:
-- **First analysis**: wardrobe crosses 8–10 items (minimum signal threshold)
-- **Manual outfit creation**: strong style intent signal — but debounced (see below)
-- **Outfit favorited**: strongest signal of style identity — triggers analysis consideration
-- **Batch additions**: 5+ items added in a single session
-
-Debounce strategy: track `itemCountAtLastAnalysis` and `favoritedOutfitCountAtLastAnalysis` on `StyleSummary`. Only auto-trigger when delta since last analysis crosses a threshold (3–5 new items, or 2+ new favorited outfits). Always allow manual "Re-analyze" button.
-
-Do NOT auto-trigger on:
-- Single item scans (accumulate dirty flag instead)
-- Item deletion (rarely changes style profile)
-- Item field edits (housekeeping, not style shift)
-
-#### Signal Hierarchy for Style Analysis
-**Tier 1 — highest signal:**
-- Favorited outfits (explicit "this is me" declaration)
-- Manual outfit compositions (intentional taste signal)
-- Category distribution (wardrobe shape)
-- Color clustering (dominant palette, not just presence)
-
-**Tier 2 — supporting signal:**
-- Formality distribution
-- Pattern preferences
-- Brand presence (if data exists)
-- Weather-relative outfit choices (temperature + month at creation)
-
-**Tier 3 — context, not core:**
-- Seasonal coverage
-- Fabric tendencies (lower confidence from photo-based estimates)
-- Statement level distribution
-
-#### Style Summary → Outfit Generation Integration
-Outfit generation prompt receives three layers (in priority order):
-1. **Comfort constraints** (from UserProfile questionnaire fields) — hard constraints, never overridden by style
-2. **Weather appropriateness** (live weather + seasonal-relative behavioral patterns from style summary)
-3. **Style alignment** (overall identity + relevant style mode from style summary)
-
-The style summary is always included once it exists. No user toggle — it enhances generation silently.
-
-#### User Editability
-- Style summary displayed on Profile page as editable text
-- If user edits the summary, `isUserEdited` flag is set
-- Edited version becomes the baseline for next incremental analysis, with prompt note: "The user has personally refined this description — weight it heavily"
-- Questionnaire answers remain separately editable; changing them re-templates the summary only if no AI enrichment has occurred yet (`isAIEnriched == false`). If AI-enriched, questionnaire changes trigger a new incremental analysis that merges updated answers with existing wardrobe observations.
+#### v0.5b — AI Style Analysis ✅ (IMPLEMENTED)
+- `AnthropicService.analyzeStyle()` with tiered prompt (favorited > manual > AI-generated outfits)
+- `StyleAnalysisDTO` / `StyleModeDTO` for structured AI response parsing
+- `StyleViewModel` with debounce (30s + count deltas), auto-triggers, and force mode
+- Enriched Profile page: style mode cards with color swatches, temporal/gap/weather sections
+- Progress bar toward 8-item AI analysis threshold for non-enriched state
+- Cross-VM wiring: `StyleViewModel` shared via `MainTabView`, triggers in `ScanViewModel` and `OutfitViewModel`
+- Richer style context passed to outfit generation when AI-enriched summary exists
 
 ### v0.6 — Image Extraction & Confidence
 - Crop/extract individual items from group photos into per-item images stored separately from the source scan image

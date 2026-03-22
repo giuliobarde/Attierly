@@ -9,6 +9,7 @@ struct OutfitsView: View {
     @State private var viewModel = OutfitViewModel()
     @Environment(\.modelContext) private var modelContext
     @Bindable var weatherViewModel: WeatherViewModel
+    var styleViewModel: StyleViewModel
 
     var body: some View {
         NavigationStack {
@@ -94,7 +95,22 @@ struct OutfitsView: View {
             viewModel.modelContext = modelContext
             viewModel.weatherViewModel = weatherViewModel
             viewModel.userProfile = profiles.first
-            viewModel.styleSummaryText = styleSummaries.first?.overallIdentity
+            viewModel.styleViewModel = styleViewModel
+            styleViewModel.modelContext = modelContext
+
+            // Build richer style context when AI-enriched
+            if let summary = styleSummaries.first, summary.isAIEnriched {
+                var ctx = "Overall: \(summary.overallIdentity)"
+                for mode in summary.styleModesDecoded {
+                    ctx += "\n- \(mode.name) (\(mode.formality)): \(mode.description). Colors: \(mode.colorPalette.joined(separator: ", "))"
+                }
+                if let weather = summary.weatherBehavior {
+                    ctx += "\nWeather behavior: \(weather)"
+                }
+                viewModel.styleSummaryText = ctx
+            } else {
+                viewModel.styleSummaryText = styleSummaries.first?.overallIdentity
+            }
         }
     }
 

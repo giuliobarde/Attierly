@@ -22,10 +22,10 @@ final class StyleSummary {
 
     var createdAt: Date
 
-    var styleModesArray: [String] {
+    var styleModesDecoded: [StyleModeDTO] {
         get {
             guard let data = styleModes?.data(using: .utf8),
-                  let array = try? JSONDecoder().decode([String].self, from: data)
+                  let array = try? JSONDecoder().decode([StyleModeDTO].self, from: data)
             else { return [] }
             return array
         }

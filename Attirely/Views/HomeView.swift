@@ -3,6 +3,7 @@ import PhotosUI
 import SwiftData
 
 struct HomeView: View {
+    var styleViewModel: StyleViewModel
     @State private var viewModel = ScanViewModel()
     @State private var selectedPhotoItem: PhotosPickerItem?
     @Environment(\.modelContext) private var modelContext
@@ -111,6 +112,8 @@ struct HomeView: View {
             }
             .onAppear {
                 viewModel.modelContext = modelContext
+                viewModel.styleViewModel = styleViewModel
+                styleViewModel.modelContext = modelContext
             }
         }
     }

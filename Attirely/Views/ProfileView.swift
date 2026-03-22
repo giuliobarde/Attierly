@@ -11,6 +11,7 @@ struct ProfileView: View {
 
     @State private var viewModel = ProfileViewModel()
     @State private var selectedPhoto: PhotosPickerItem?
+    var styleViewModel: StyleViewModel
 
     private var profile: UserProfile? { profiles.first }
 
@@ -32,6 +33,7 @@ struct ProfileView: View {
             .navigationTitle("Profile")
             .onAppear {
                 viewModel.ensureProfileExists(in: modelContext)
+                styleViewModel.modelContext = modelContext
             }
         }
     }
@@ -377,6 +379,159 @@ struct ProfileView: View {
 
     private var styleSummarySection: some View {
         VStack(alignment: .leading, spacing: 12) {
+            if let summary = styleSummaries.first, summary.isAIEnriched {
+                aiEnrichedSummary(summary)
+            } else {
+                templateSummary
+            }
+        }
+        .themeCard()
+    }
+
+    private func aiEnrichedSummary(_ summary: StyleSummary) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            // Header
+            HStack {
+                Text("Your Style Profile")
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                    .foregroundStyle(Theme.primaryText)
+                Spacer()
+                Button(viewModel.isEditingStyleSummary ? "Done" : "Edit") {
+                    if viewModel.isEditingStyleSummary {
+                        viewModel.updateSummaryText(viewModel.editedStyleSummary)
+                    } else {
+                        viewModel.editedStyleSummary = summary.overallIdentity
+                    }
+                    viewModel.isEditingStyleSummary.toggle()
+                }
+                .font(.caption)
+                .foregroundStyle(Theme.champagne)
+            }
+
+            // Overall identity
+            if viewModel.isEditingStyleSummary {
+                TextEditor(text: $viewModel.editedStyleSummary)
+                    .font(.subheadline)
+                    .foregroundStyle(Theme.primaryText)
+                    .frame(minHeight: 100)
+                    .scrollContentBackground(.hidden)
+                    .padding(4)
+                    .background(Theme.placeholderFill)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+            } else {
+                Text(summary.overallIdentity)
+                    .font(.subheadline)
+                    .foregroundStyle(Theme.primaryText)
+            }
+
+            // Style mode cards
+            let modes = summary.styleModesDecoded
+            if !modes.isEmpty {
+                ForEach(modes, id: \.name) { mode in
+                    styleModeCard(mode)
+                }
+            }
+
+            // Secondary sections
+            if let temporal = summary.temporalNotes, !temporal.isEmpty {
+                secondarySection(title: "Seasonal Patterns", text: temporal)
+            }
+            if let gaps = summary.gapObservations, !gaps.isEmpty {
+                secondarySection(title: "Opportunities", text: gaps)
+            }
+            if let weather = summary.weatherBehavior, !weather.isEmpty {
+                secondarySection(title: "Weather Style", text: weather)
+            }
+
+            // Tags
+            HStack(spacing: 8) {
+                if summary.isUserEdited {
+                    Text("Edited by you")
+                        .themeTag()
+                }
+                Text("AI Enhanced")
+                    .themeTag()
+            }
+
+            // Footer
+            Text("Last analyzed \(summary.lastAnalyzedAt.formatted(.relative(presentation: .named))) · Based on \(summary.itemCountAtLastAnalysis) items")
+                .font(.caption2)
+                .foregroundStyle(Theme.secondaryText)
+
+            // Re-analyze button
+            Button {
+                styleViewModel.analyzeStyle(
+                    items: clothingItems,
+                    outfits: outfits,
+                    profile: profile,
+                    force: true
+                )
+            } label: {
+                if styleViewModel.isAnalyzing {
+                    HStack(spacing: 8) {
+                        ProgressView()
+                            .scaleEffect(0.8)
+                        Text("Analyzing...")
+                    }
+                    .frame(maxWidth: .infinity)
+                } else {
+                    Label("Re-analyze Style", systemImage: "arrow.clockwise")
+                        .frame(maxWidth: .infinity)
+                }
+            }
+            .buttonStyle(.themeSecondary)
+            .disabled(styleViewModel.isAnalyzing)
+        }
+    }
+
+    private func styleModeCard(_ mode: StyleModeDTO) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Text(mode.name)
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
+                    .foregroundStyle(Theme.primaryText)
+                Spacer()
+                Text(mode.formality)
+                    .themeTag()
+            }
+
+            Text(mode.description)
+                .font(.caption)
+                .foregroundStyle(Theme.secondaryText)
+
+            // Color palette swatches
+            if !mode.colorPalette.isEmpty {
+                HStack(spacing: 6) {
+                    ForEach(mode.colorPalette, id: \.self) { colorName in
+                        Circle()
+                            .fill(ColorMapping.color(for: colorName))
+                            .frame(width: 20, height: 20)
+                            .overlay(Circle().stroke(Theme.cardBorder, lineWidth: 1))
+                    }
+                }
+            }
+        }
+        .padding(10)
+        .background(Theme.placeholderFill)
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+    }
+
+    private func secondarySection(title: String, text: String) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title)
+                .font(.caption)
+                .fontWeight(.medium)
+                .foregroundStyle(Theme.secondaryText)
+            Text(text)
+                .font(.caption)
+                .foregroundStyle(Theme.primaryText)
+        }
+    }
+
+    private var templateSummary: some View {
+        VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Text("Your Style Summary")
                     .font(.subheadline)
@@ -422,8 +577,53 @@ struct ProfileView: View {
                     .font(.caption)
                     .foregroundStyle(Theme.secondaryText)
             }
+
+            // Progress toward AI analysis
+            let itemCount = clothingItems.count
+            ProgressView(value: Double(min(itemCount, 8)), total: 8)
+                .tint(Theme.champagne)
+
+            if itemCount >= 8 {
+                Text("Ready for AI style analysis")
+                    .font(.caption)
+                    .foregroundStyle(Theme.champagne)
+            } else {
+                Text("\(itemCount)/8 items — add more to unlock AI style analysis")
+                    .font(.caption)
+                    .foregroundStyle(Theme.secondaryText)
+            }
+
+            if styleViewModel.canAnalyze {
+                Button {
+                    styleViewModel.analyzeStyle(
+                        items: clothingItems,
+                        outfits: outfits,
+                        profile: profile,
+                        force: true
+                    )
+                } label: {
+                    if styleViewModel.isAnalyzing {
+                        HStack(spacing: 8) {
+                            ProgressView()
+                                .scaleEffect(0.8)
+                            Text("Analyzing your style...")
+                        }
+                        .frame(maxWidth: .infinity)
+                    } else {
+                        Label("Analyze My Style", systemImage: "sparkles")
+                            .frame(maxWidth: .infinity)
+                    }
+                }
+                .buttonStyle(.themePrimary)
+                .disabled(styleViewModel.isAnalyzing)
+            }
+
+            if let error = styleViewModel.errorMessage {
+                Text(error)
+                    .font(.caption)
+                    .foregroundStyle(.red)
+            }
         }
-        .themeCard()
     }
 
     // MARK: - Analytics

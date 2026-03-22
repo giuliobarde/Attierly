@@ -15,6 +15,7 @@ class ScanViewModel {
     var isCheckingDuplicates = false
 
     var modelContext: ModelContext?
+    var styleViewModel: StyleViewModel?
 
     var visibleItems: [ClothingItemDTO] {
         scannedItems.filter { !dismissedItemIDs.contains($0.id) }
@@ -58,6 +59,7 @@ class ScanViewModel {
             modelContext.insert(clothingItem)
             try modelContext.save()
             savedItemIDs.insert(dto.id)
+            notifyStyleAnalysisIfNeeded()
         } catch {
             errorMessage = "Failed to save item: \(error.localizedDescription)"
         }
@@ -108,5 +110,13 @@ class ScanViewModel {
         }
 
         isCheckingDuplicates = false
+    }
+
+    private func notifyStyleAnalysisIfNeeded() {
+        guard let context = modelContext else { return }
+        let items = (try? context.fetch(FetchDescriptor<ClothingItem>())) ?? []
+        let outfits = (try? context.fetch(FetchDescriptor<Outfit>())) ?? []
+        let profile = (try? context.fetch(FetchDescriptor<UserProfile>()))?.first
+        styleViewModel?.analyzeStyle(items: items, outfits: outfits, profile: profile)
     }
 }

@@ -15,6 +15,8 @@ Attirely is an iOS app that uses AI-powered vision to identify and analyze cloth
 - **Profile page** — user name, profile photo, wardrobe summary stats, style & comfort questionnaire, and style summary display
 - **Style & Comfort questionnaire** — cold/heat sensitivity, body temp notes, layering preference, style identity (multi-select tag grid), comfort vs appearance, and weather dressing approach
 - **Style summary** — auto-generated from questionnaire via template, editable by user, displayed on profile page
+- **AI style analysis** — Claude analyzes your wardrobe and outfit patterns to detect style modes, seasonal trends, wardrobe gaps, and weather-relative dressing behavior. Triggered automatically as your wardrobe grows, or manually via "Analyze/Re-analyze" button
+- **Enriched style profile** — AI-detected style modes displayed as cards with color palette swatches, plus seasonal patterns, opportunities, and weather style sections
 - **User preferences** — temperature unit (°C/°F) applied across all weather displays, theme preference (System/Light/Dark) with full dark mode, custom location override with city geocoding
 - **Comfort-aware outfits** — AI outfit generation respects user's comfort preferences (cold/heat sensitivity, layering, weather dressing approach) as hard constraints
 - **Dark mode** — warm espresso/charcoal dark palette with adaptive colors throughout; champagne accent stays consistent across modes
@@ -54,11 +56,12 @@ Attirely/
 │   ├── ScanSession.swift              # Scan session grouping
 │   ├── Outfit.swift                   # Outfit collection model (+ weather snapshot)
 │   ├── OutfitSuggestionDTO.swift      # AI outfit response parsing
+│   ├── StyleAnalysisDTO.swift         # AI style analysis response parsing
 │   ├── WeatherData.swift              # Weather data structs (ephemeral)
 │   ├── UserProfile.swift             # User profile, preferences, style questionnaire
 │   └── StyleSummary.swift            # Style summary model (template/AI)
 ├── Services/
-│   ├── AnthropicService.swift         # Claude API (scan, duplicates, outfits)
+│   ├── AnthropicService.swift         # Claude API (scan, duplicates, outfits, style analysis)
 │   ├── ConfigManager.swift            # API key configuration
 │   ├── ImageStorageService.swift      # Disk image storage
 │   ├── LocationService.swift          # CoreLocation wrapper
@@ -68,7 +71,8 @@ Attirely/
 │   ├── WardrobeViewModel.swift        # Wardrobe filtering/display
 │   ├── OutfitViewModel.swift          # Outfit creation/generation/favorites
 │   ├── WeatherViewModel.swift         # Weather state management
-│   └── ProfileViewModel.swift        # Profile state + analytics
+│   ├── ProfileViewModel.swift        # Profile state + analytics
+│   └── StyleViewModel.swift          # AI style analysis state + debounce
 ├── Views/
 │   ├── MainTabView.swift              # Tab bar (Scan + Outfits + Wardrobe + Profile)
 │   ├── HomeView.swift                 # Scan tab

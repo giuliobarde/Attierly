@@ -4,6 +4,7 @@ import CoreLocation
 
 struct MainTabView: View {
     @State private var weatherViewModel = WeatherViewModel()
+    @State private var styleViewModel = StyleViewModel()
     @Query private var profiles: [UserProfile]
 
     private var activeProfile: UserProfile? { profiles.first }
@@ -29,16 +30,16 @@ struct MainTabView: View {
     var body: some View {
         TabView {
             Tab("Scan", systemImage: "camera") {
-                HomeView()
+                HomeView(styleViewModel: styleViewModel)
             }
             Tab("Outfits", systemImage: "sparkles") {
-                OutfitsView(weatherViewModel: weatherViewModel)
+                OutfitsView(weatherViewModel: weatherViewModel, styleViewModel: styleViewModel)
             }
             Tab("Wardrobe", systemImage: "tshirt") {
                 WardrobeView(weatherViewModel: weatherViewModel)
             }
             Tab("Profile", systemImage: "person") {
-                ProfileView()
+                ProfileView(styleViewModel: styleViewModel)
             }
         }
         .onAppear {

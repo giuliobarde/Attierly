@@ -8,6 +8,7 @@ enum AnthropicError: LocalizedError {
     case decodingError(String)
     case emptyResults
     case insufficientWardrobe
+    case insufficientData
 
     var errorDescription: String? {
         switch self {
@@ -23,6 +24,8 @@ enum AnthropicError: LocalizedError {
             return "No clothing items detected. Try a clearer photo."
         case .insufficientWardrobe:
             return "Add more items to your wardrobe before generating outfits."
+        case .insufficientData:
+            return "Not enough wardrobe data for style analysis. Add more items."
         }
     }
 }
@@ -316,6 +319,184 @@ struct AnthropicService {
         }
 
         return suggestions
+    }
+
+    // MARK: - Style Analysis
+
+    private static let styleAnalysisPrompt = """
+    You are a personal style analyst. Based on the wardrobe data below, produce a comprehensive style profile.
+
+    INSTRUCTIONS:
+    - Analyze the user's clothing items, outfit choices, and stated preferences to identify their style identity.
+    - Weight signals in this order of importance:
+      1. USER-DECLARED PREFERENCES are ground truth — never contradict these.
+      2. FAVORITED OUTFITS reflect intentional style choices — strongest behavioral signal.
+      3. MANUALLY CREATED OUTFITS show deliberate pairing decisions.
+      4. AI-GENERATED OUTFITS are suggestions the user kept but may not fully represent preference.
+      5. Individual wardrobe items show what they own but not necessarily how they prefer to wear it.
+    - Detect 1-3 distinct style modes organically from the data. Do not force a fixed count — some users have one cohesive style, others have 3-4 modes. Derive modes primarily from favorited outfit clusters.
+    - Each style mode needs: a descriptive name, a 1-2 sentence description, a color palette (3-5 dominant color names from their wardrobe that define this mode), and a formality level.
+    - If there is insufficient data for a field, return null rather than guessing.
+
+    Return ONLY a valid JSON object with these fields:
+    - "overall_identity": 2-4 sentences capturing the user's dominant aesthetic, color tendencies, and formality range
+    - "style_modes": array of objects with "name" (string), "description" (string), "color_palette" (array of color name strings matching wardrobe colors), "formality" (one of "Casual", "Smart Casual", "Business Casual", "Business", "Formal")
+    - "temporal_notes": string or null — any directional shifts in recent items/favorites vs older ones, framed as observations not identity rewrites
+    - "gap_observations": string or null — wardrobe gaps and opportunities
+    - "weather_behavior": string or null — seasonal-relative dressing patterns detected from outfit weather data
+
+    No markdown, no explanation, no code fences. Just the raw JSON object.
+    """
+
+    private static let incrementalAnalysisAddendum = """
+
+    IMPORTANT — INCREMENTAL ANALYSIS:
+    A previous style analysis exists (shown below). Treat it as the baseline identity. Style evolves gradually — only adjust the profile where new evidence is compelling. Do not radically change the overall identity based on a few new items. Preserve established patterns unless the data clearly contradicts them.
+    """
+
+    static func analyzeStyle(
+        items: [ClothingItem],
+        outfits: [Outfit],
+        profile: UserProfile?,
+        existingSummary: StyleSummary?
+    ) async throws -> StyleAnalysisDTO {
+        guard items.count >= 8 else {
+            throw AnthropicError.insufficientData
+        }
+
+        let apiKey = try ConfigManager.apiKey()
+
+        // Cap items to most recent 60
+        let cappedItems = Array(items.sorted { $0.createdAt > $1.createdAt }.prefix(60))
+
+        var itemList = "WARDROBE ITEMS (\(cappedItems.count) items):\n"
+        for item in cappedItems {
+            itemList += "- \(item.type) | \(item.category) | \(item.primaryColor)"
+            if let secondary = item.secondaryColor {
+                itemList += "/\(secondary)"
+            }
+            itemList += " | \(item.pattern) | \(item.fabricEstimate) | \(item.formality)"
+            itemList += " | seasons:\(item.season.joined(separator: ","))"
+            itemList += " | \(item.itemDescription)\n"
+        }
+
+        // Tier outfits by signal strength
+        let favorited = Array(outfits.filter { $0.isFavorite }.prefix(10))
+        let manualNonFav = Array(outfits.filter { !$0.isAIGenerated && !$0.isFavorite }.prefix(5))
+        let aiNonFav = Array(outfits.filter { $0.isAIGenerated && !$0.isFavorite }.prefix(5))
+
+        var outfitSection = ""
+        if !favorited.isEmpty {
+            outfitSection += "\nFAVORITED OUTFITS (highest weight — the user's self-identified best outfits):\n"
+            outfitSection += formatOutfitList(favorited)
+        }
+        if !manualNonFav.isEmpty {
+            outfitSection += "\nMANUALLY CREATED OUTFITS (deliberate pairing decisions):\n"
+            outfitSection += formatOutfitList(manualNonFav)
+        }
+        if !aiNonFav.isEmpty {
+            outfitSection += "\nAI-GENERATED OUTFITS (accepted suggestions):\n"
+            outfitSection += formatOutfitList(aiNonFav)
+        }
+
+        // User preferences
+        var preferencesSection = ""
+        if let profile {
+            var prefs: [String] = []
+            let styles = profile.selectedStylesArray
+            if !styles.isEmpty { prefs.append("Self-identified styles: \(styles.joined(separator: ", "))") }
+            if let cold = profile.coldSensitivityEnum { prefs.append("Cold sensitivity: \(cold.rawValue)") }
+            if let heat = profile.heatSensitivityEnum { prefs.append("Heat sensitivity: \(heat.rawValue)") }
+            if let notes = profile.bodyTempNotes, !notes.trimmingCharacters(in: .whitespaces).isEmpty {
+                prefs.append("Body temp notes: \(notes.trimmingCharacters(in: .whitespaces))")
+            }
+            if let layering = profile.layeringPreferenceEnum { prefs.append("Layering: \(layering.rawValue)") }
+            if let comfort = profile.comfortVsAppearanceEnum { prefs.append("Comfort vs appearance: \(comfort.rawValue)") }
+            if let weather = profile.weatherDressingApproachEnum { prefs.append("Weather dressing: \(weather.rawValue)") }
+
+            if !prefs.isEmpty {
+                preferencesSection = "\nUSER-DECLARED PREFERENCES (treat as ground truth — do not contradict):\n"
+                    + prefs.joined(separator: "\n") + "\n"
+            }
+        }
+
+        // Existing summary for incremental analysis
+        var existingSummarySection = ""
+        if let existingSummary {
+            existingSummarySection = "\nPREVIOUS ANALYSIS"
+            if existingSummary.isUserEdited {
+                existingSummarySection += " (user has personally refined this — weight their edits heavily and preserve their characterizations unless wardrobe data strongly contradicts them)"
+            }
+            existingSummarySection += ":\n\(existingSummary.overallIdentity)\n"
+
+            let modes = existingSummary.styleModesDecoded
+            if !modes.isEmpty {
+                existingSummarySection += "Previous style modes: "
+                existingSummarySection += modes.map { $0.name }.joined(separator: ", ")
+                existingSummarySection += "\n"
+            }
+            if let temporal = existingSummary.temporalNotes {
+                existingSummarySection += "Previous temporal notes: \(temporal)\n"
+            }
+            if let gaps = existingSummary.gapObservations {
+                existingSummarySection += "Previous gap observations: \(gaps)\n"
+            }
+            if let weather = existingSummary.weatherBehavior {
+                existingSummarySection += "Previous weather behavior: \(weather)\n"
+            }
+        }
+
+        let basePrompt = existingSummary != nil
+            ? styleAnalysisPrompt + incrementalAnalysisAddendum
+            : styleAnalysisPrompt
+
+        let fullPrompt = basePrompt + "\n\n" + preferencesSection + itemList + outfitSection + existingSummarySection
+
+        let requestBody: [String: Any] = [
+            "model": model,
+            "max_tokens": 2048,
+            "messages": [
+                ["role": "user", "content": fullPrompt]
+            ]
+        ]
+
+        let text = try await sendRequest(body: requestBody, apiKey: apiKey)
+        let cleanedText = stripCodeFences(text)
+
+        guard let jsonData = cleanedText.data(using: .utf8) else {
+            throw AnthropicError.decodingError("Invalid text encoding.")
+        }
+
+        let analysis: StyleAnalysisDTO
+        do {
+            analysis = try JSONDecoder().decode(StyleAnalysisDTO.self, from: jsonData)
+        } catch {
+            throw AnthropicError.decodingError(error.localizedDescription)
+        }
+
+        return analysis
+    }
+
+    private static func formatOutfitList(_ outfits: [Outfit]) -> String {
+        var result = ""
+        for outfit in outfits {
+            result += "  Outfit: \(outfit.displayName)"
+            if let occasion = outfit.occasion { result += " (\(occasion))" }
+            result += "\n"
+            if let temp = outfit.weatherTempAtCreation {
+                result += "    Weather at creation: \(Int(temp))°C"
+                if let feelsLike = outfit.weatherFeelsLikeAtCreation {
+                    result += " (feels like \(Int(feelsLike))°C)"
+                }
+                if let season = outfit.seasonAtCreation { result += ", \(season)" }
+                if let month = outfit.monthAtCreation { result += ", month \(month)" }
+                result += "\n"
+            }
+            for item in outfit.items {
+                result += "    - \(item.type) | \(item.category) | \(item.primaryColor) | \(item.formality)\n"
+            }
+        }
+        return result
     }
 
     // MARK: - Helpers

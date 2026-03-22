@@ -28,6 +28,7 @@ class OutfitViewModel {
     var weatherViewModel: WeatherViewModel?
     var userProfile: UserProfile?
     var styleSummaryText: String?
+    var styleViewModel: StyleViewModel?
 
     // MARK: - List
 
@@ -51,6 +52,9 @@ class OutfitViewModel {
             outfit.monthAtCreation = outfit.monthAtCreation ?? Calendar.current.component(.month, from: Date())
         }
         try? modelContext?.save()
+        if outfit.isFavorite {
+            notifyStyleAnalysis()
+        }
     }
 
     // MARK: - Delete
@@ -88,6 +92,7 @@ class OutfitViewModel {
         captureWeatherSnapshot(on: outfit)
         modelContext.insert(outfit)
         try? modelContext.save()
+        notifyStyleAnalysis()
 
         resetManualCreation()
     }
@@ -136,6 +141,7 @@ class OutfitViewModel {
                 }
 
                 try? modelContext.save()
+                self.notifyStyleAnalysis()
                 self.generatedOutfits = created
                 self.showGeneratedResults = !created.isEmpty
                 self.isShowingGenerateSheet = false
@@ -166,6 +172,15 @@ class OutfitViewModel {
             outfit.seasonAtCreation = weatherViewModel?.suggestedSeason
         }
         outfit.monthAtCreation = Calendar.current.component(.month, from: Date())
+    }
+
+    // MARK: - Style Analysis Trigger
+
+    private func notifyStyleAnalysis() {
+        guard let context = modelContext else { return }
+        let items = (try? context.fetch(FetchDescriptor<ClothingItem>())) ?? []
+        let outfits = (try? context.fetch(FetchDescriptor<Outfit>())) ?? []
+        styleViewModel?.analyzeStyle(items: items, outfits: outfits, profile: userProfile)
     }
 
     // MARK: - Comfort Preferences
