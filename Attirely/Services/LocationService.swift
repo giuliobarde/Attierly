@@ -1,5 +1,6 @@
 import CoreLocation
 import Foundation
+import MapKit
 
 enum LocationError: LocalizedError {
     case permissionDenied
@@ -54,9 +55,10 @@ final class LocationService: NSObject, CLLocationManagerDelegate {
     }
 
     static func reverseGeocode(location: CLLocation) async -> String? {
-        let geocoder = CLGeocoder()
-        let placemarks = try? await geocoder.reverseGeocodeLocation(location)
-        return placemarks?.first?.locality
+        guard let request = MKReverseGeocodingRequest(location: location) else { return nil }
+        guard let mapItems = try? await request.mapItems,
+              let mapItem = mapItems.first else { return nil }
+        return mapItem.addressRepresentations?.cityWithContext
     }
 
     // MARK: - CLLocationManagerDelegate

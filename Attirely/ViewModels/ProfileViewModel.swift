@@ -1,6 +1,7 @@
 import SwiftUI
 import SwiftData
 import CoreLocation
+import MapKit
 
 @Observable
 class ProfileViewModel {
@@ -80,13 +81,18 @@ class ProfileViewModel {
         locationError = nil
 
         Task {
-            let geocoder = CLGeocoder()
             do {
-                let placemarks = try await geocoder.geocodeAddressString(cityName)
-                if let location = placemarks.first?.location {
+                guard let request = MKGeocodingRequest(addressString: cityName) else {
+                    locationError = "Could not find that location."
+                    isGeocodingLocation = false
+                    return
+                }
+                let mapItems = try await request.mapItems
+                if let location = mapItems.first?.location {
+                    let coordinate = location.coordinate
                     profile.locationOverrideName = cityName
-                    profile.locationOverrideLat = location.coordinate.latitude
-                    profile.locationOverrideLon = location.coordinate.longitude
+                    profile.locationOverrideLat = coordinate.latitude
+                    profile.locationOverrideLon = coordinate.longitude
                     profile.updatedAt = Date()
                     try? modelContext?.save()
                 } else {
